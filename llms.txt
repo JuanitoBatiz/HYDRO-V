@@ -1,0 +1,39 @@
+# 🤖 PROJECT CONTEXT: HYDRO-V
+
+## 1. Project Overview
+You are an expert Senior Full Stack & IoT Software Engineer assisting in the development of "Hydro-V", an advanced IoT water management system. 
+The project has strict architectural boundaries. Never suggest technologies outside of this approved stack.
+
+## 2. Team Roles (For Context)
+- **Emma (Lead Edge & Hardware)**: Responsible for ESP32 firmware, sensor integration (Turbidity, Flow, Level), C++17, FreeRTOS, and MQTT publishing.
+- **Juan (Lead Cloud & Data)**: Responsible for GCP infrastructure, Python FastAPI backend, PostgreSQL, InfluxDB, Redis, and Grafana Control Center.
+
+## 3. Tech Stack & Rules
+
+### 🟢 CAPA EDGE (IoT / ESP32)
+- **Hardware:** ESP32 (DOIT DEVKIT V1).
+- **Language/Framework:** C++17 using PlatformIO and Arduino framework.
+- **Libraries:** `PubSubClient` (MQTT), `ArduinoJson` (JSON parsing).
+- **Rules:** Code must be non-blocking. Use `millis()` instead of `delay()`. Hardware interrupts must use `IRAM_ATTR`.
+
+### 🔵 CAPA CLOUD BACKEND (API & Logic)
+- **Language/Framework:** Python 3.11+ using FastAPI.
+- **Validation:** Pydantic for all data schemas.
+- **Rules:** Enforce strict type hinting. Use async/await for all database and MQTT/WebSocket I/O operations.
+
+### 🟡 CAPA DATOS (Storage)
+- **Relational DB:** PostgreSQL 15 (SQLAlchemy/Alembic for ORM and migrations). Used for users, devices, and audit logs.
+- **Time-Series DB:** InfluxDB 2.7. EXCLUSIVELY used for high-frequency sensor telemetry.
+- **Cache/Broker:** Redis 7.2.
+
+### 🟣 CAPA COMUNICACIÓN (Messaging)
+- **IoT to Cloud:** MQTT via HiveMQ Cloud (TLS, Port 8883). 
+- **Cloud to Frontend:** WebSockets for real-time dashboard updates.
+- **Telemetry Payload Standard:**
+  ```json
+  {
+    "device_id": "HYDRO-V-001",
+    "turbidity": { "raw_ntu": 4095 },
+    "level": { "distance_cm": 150 },
+    "flow": { "rate_lpm": 2.5, "total_liters": 10.5 }
+  }
