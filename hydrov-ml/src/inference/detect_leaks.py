@@ -16,7 +16,7 @@ from __future__ import annotations
 import torch
 import numpy as np
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.models.gnn_leak_detection import HydroGNN
 from src.data.synthetic_generator import construir_grafo_instantaneo
@@ -75,7 +75,7 @@ class LeakDetector:
             prob_anomalia = probs[:, 1].numpy()   # Clase 1 = anomalía
 
         anomalias = []
-        timestamp_iso = datetime.utcnow().isoformat() + "Z"
+        timestamp_iso = datetime.now(timezone.utc).isoformat() + "Z"
 
         for i, prob in enumerate(prob_anomalia):
             if prob >= UMBRAL_ANOMALIA:
@@ -90,3 +90,41 @@ class LeakDetector:
                 )
 
         return anomalias
+    
+if __name__ == "__main__":
+    from src.data.synthetic_generator import generar_red_completa
+    
+    print("==================================================")
+    print("🌐 HYDRO-V: INICIANDO ESCÁNER DE RED (GNN)")
+    print("==================================================")
+    
+    try:
+        # 1. Cargamos el radar (el modelo entrenado)
+        detector = LeakDetector()
+        
+        # 2. Generamos una "foto" instantánea de la red virtual de Neza
+        print("📡 Simulando telemetría de 49 nodos vecinos...")
+        df_red_simulada = generar_red_completa(dias=1)
+        
+        # 3. La IA analiza el grafo buscando anomalías
+        print("🧠 Ejecutando inferencia GraphSAGE...")
+        alertas = detector.detectar(df_red_simulada)
+        
+        print("\n==================================================")
+        print("🚨 REPORTE DE FUGAS DETECTADAS")
+        print("==================================================")
+        
+        if not alertas:
+            print("✅ La red está estable. No se detectaron fugas.")
+        else:
+            print(f"⚠️ ¡ATENCIÓN! Se detectaron {len(alertas)} posibles fugas:")
+            for alerta in alertas:
+                print(f"  📍 Nodo: {alerta.device_id}")
+                print(f"     Probabilidad: {alerta.probabilidad:.1%}")
+                print(f"     Severidad:    {alerta.severidad}")
+                print(f"     Hora:         {alerta.detectado_en}")
+                print("  --------------------------------------")
+                
+    except FileNotFoundError:
+        print("🛑 ¡Error! No se encontró el cerebro de la GNN.")
+        print("   Asegúrate de haber ejecutado: python -m src.training.train_gnn")    

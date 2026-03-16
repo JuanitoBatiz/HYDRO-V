@@ -142,3 +142,30 @@ class AutonomyPredictor:
         instance._is_fitted = True
         print(f"[AutonomyPredictor] Modelo cargado desde: {path}")
         return instance
+if __name__ == "__main__":
+    import pandas as pd
+    import os
+
+    print("🏋️‍♂️ Entrenando el modelo de Regresión Lineal...")
+    
+    # Creamos un historial falso con las 6 variables exactas que espera el modelo
+    df_entrenamiento = pd.DataFrame({
+        'nivel_actual_litros': [1000.0, 500.0, 250.0, 800.0, 100.0],
+        'consumo_7d_lpm': [2.0, 2.5, 3.0, 1.5, 4.0],
+        'consumo_30d_lpm': [2.1, 2.4, 2.9, 1.6, 3.8],
+        'precipitacion_mm': [0.0, 5.0, 0.0, 12.0, 0.0],
+        'dia_semana': [0, 1, 2, 3, 4], # Lunes a Viernes
+        'mes': [3, 3, 4, 4, 5],        # Marzo, Abril, Mayo
+        'dias_restantes': [500, 200, 83, 533, 25] 
+    })
+    
+    X = df_entrenamiento[['nivel_actual_litros', 'consumo_7d_lpm', 'consumo_30d_lpm', 'precipitacion_mm', 'dia_semana', 'mes']].values
+    y = df_entrenamiento['dias_restantes'].values
+    
+    modelo = AutonomyPredictor()
+    modelo.fit(X, y)
+    
+    os.makedirs('models', exist_ok=True)
+    modelo.save('models/linear_autonomy.pkl')
+    
+    print("✅ ¡Modelo entrenado y guardado con éxito! El archivo ya tiene datos.")    

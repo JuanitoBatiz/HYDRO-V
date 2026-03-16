@@ -8,7 +8,7 @@ from __future__ import annotations
 import pickle
 import numpy as np
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.models.linear_autonomy import AutonomyPredictor
 
@@ -64,7 +64,7 @@ class AutonomyInference:
         Returns:
             PrediccionAutonomia con días restantes y fecha estimada.
         """
-        ahora = datetime.utcnow()
+        ahora = datetime.now(timezone.utc)
         X = np.array([[
             nivel_actual_litros,
             consumo_7d_lpm,
@@ -84,3 +84,31 @@ class AutonomyInference:
             confianza=0.89,   # Actualizar con R² real tras entrenar
             nivel_actual_litros=nivel_actual_litros,
         )
+if __name__ == "__main__":
+    try:
+        # Instanciamos el cerebro de predicción
+        predictor = AutonomyInference()
+        
+        # Le pasamos un escenario simulado (ej. tinaco a la mitad, sin lluvia)
+        resultado = predictor.predecir(
+            device_id="HYDRO-V-NEZA-001",
+            nivel_actual_litros=550.0,  
+            consumo_7d_lpm=2.3,         
+            consumo_30d_lpm=2.1,
+            precipitacion_mm=0.0        
+        )
+        
+        print("=========================================")
+        print("🤖 PREDICCIÓN DE AUTONOMÍA HYDRO-V")
+        print("=========================================")
+        print(f"📍 Nodo: {resultado.device_id}")
+        print(f"💧 Nivel Actual: {resultado.nivel_actual_litros} Litros")
+        print(f"⏳ Días Restantes: {resultado.dias_restantes} días")
+        print(f"📅 Fecha en que se vacía: {resultado.fecha_proxima_recarga}")
+        print("=========================================")
+        
+    except FileNotFoundError:
+        print("🛑 ¡Falta de entrenamiento! El archivo models/linear_autonomy.pkl no existe.")
+        print("Necesitamos entrenar la Regresión Lineal primero.")
+
+    
