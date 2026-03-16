@@ -18,18 +18,18 @@
 // ============================================
 // WIFI & MQTT CONFIGURATION - HiveMQ Cloud
 // ============================================
-#define WIFI_SSID               "TU_WIFI_AQUI"
-#define WIFI_PASSWORD           "TU_PASS_AQUI"
+#define WIFI_SSID               "FCP-1"
+#define WIFI_PASSWORD           "FCP2430290431"
 
 #define MQTT_BROKER             "56e39f9776c14953958f63d9c18ae8ef.s1.eu.hivemq.cloud"
 #define MQTT_PORT               8883
-#define MQTT_USERNAME           "TU_USUARIO"
-#define MQTT_PASSWORD           "TU_PASS"
+#define MQTT_USERNAME           "hydrov_esp32_01"
+#define MQTT_PASSWORD           "Emmamiamor1"
 #define MQTT_CLIENT_ID          "HYDRO-V-001"
 #define MQTT_USE_TLS            true
 
 // MQTT Topics
-#define MQTT_TOPIC_TELEMETRY    "hydrov/HYDRO-V-001/telemetry"
+#define MQTT_TOPIC_TELEMETRY    "hydrov/neza/001/telemetry"
 #define MQTT_TOPIC_COMMANDS     "hydrov/HYDRO-V-001/commands"
 
 // ============================================
