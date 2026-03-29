@@ -1,0 +1,587 @@
+{
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.4.0"},
+    {"type": "datasource", "id": "influxdb", "name": "InfluxDB", "version": "1.0.0"},
+    {"type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0"}
+  ],
+  "__inputs": [
+    {"name": "DS_HYDROV-TIMESERIES", "label": "HydroV-TimeSeries", "type": "datasource", "pluginId": "influxdb"},
+    {"name": "DS_HYDROV-POSTGRESQL", "label": "HydroV-PostgreSQL", "type": "datasource", "pluginId": "postgres"}
+  ],
+  "title": "🛰️ HYDRO-V — Mission Control",
+  "uid": "hydrov-mission-control",
+  "description": "Control center principal del sistema Hydro-V. Telemetría en tiempo real, estado FSM, calidad del agua y mapa de nodos.",
+  "tags": ["hydrov", "telemetry", "real-time"],
+  "timezone": "America/Mexico_City",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "links": [
+    {"title": "Node Deep Dive", "url": "/d/hydrov-node-deep-dive", "type": "link", "icon": "external link"},
+    {"title": "Network Intelligence", "url": "/d/hydrov-network-intelligence", "type": "link", "icon": "external link"}
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "device_id",
+        "label": "Nodo",
+        "type": "query",
+        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "query": "SELECT device_id FROM devices WHERE is_active = true ORDER BY device_id",
+        "current": {"text": "HYDRO-V-001", "value": "HYDRO-V-001"},
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Alertas EMERGENCY",
+        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "rawQuery": true,
+        "rawSql": "SELECT EXTRACT(EPOCH FROM timestamp) * 1000 AS time, 'EMERGENCY' AS text, node_id AS tags FROM emergency_alerts WHERE node_id = '${device_id}' AND $__timeFilter(timestamp)",
+        "enable": true,
+        "hide": false,
+        "iconColor": "#F44336",
+        "step": "60s"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Estado del Sistema",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state\")\n  |> last()",
+          "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"}
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "text": {"titleSize": 12, "valueSize": 28},
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "IDLE":      {"text": "⏸  IDLE",            "color": "#9E9E9E", "index": 0},
+                "ANALYZING": {"text": "🔬 ANALIZANDO",       "color": "#2196F3", "index": 1},
+                "HARVESTING":{"text": "💧 COSECHANDO",       "color": "#4CAF50", "index": 2},
+                "FULL_TANK": {"text": "✅ CISTERNA LLENA",   "color": "#00BCD4", "index": 3},
+                "EMERGENCY": {"text": "🚨 EMERGENCIA",       "color": "#F44336", "index": 4}
+              }
+            }
+          ],
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#9E9E9E", "value": null}]}
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "💧 Nivel de Cisterna",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 5, "x": 0, "y": 4},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> last()\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#F44336", "value": null},
+              {"color": "#FF9800", "value": 20},
+              {"color": "#FFC107", "value": 50},
+              {"color": "#4CAF50", "value": 80}
+            ]
+          },
+          "decimals": 1,
+          "displayName": "Nivel"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "🌊 Turbidez del Agua",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 5, "x": 5, "y": 4},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> last()"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 200,
+          "decimals": 1,
+          "displayName": "NTU",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#4CAF50", "value": null},
+              {"color": "#FF9800", "value": 5},
+              {"color": "#FF5722", "value": 15},
+              {"color": "#F44336", "value": 50}
+            ]
+          },
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 0,  "to": 5,   "result": {"text": "LIMPIA ✓",   "color": "#4CAF50"}
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 5,  "to": 15,  "result": {"text": "ACEPTABLE",  "color": "#FF9800"}
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 15, "to": 50,  "result": {"text": "TURBIA",     "color": "#FF5722"}
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 50, "to": 9999,"result": {"text": "RECHAZADA ✗","color": "#F44336"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "🚿 Caudal Actual",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> aggregateWindow(every: 30s, fn: mean)"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Lpm",
+          "decimals": 2,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#9E9E9E", "value": null},
+              {"color": "#4CAF50", "value": 0.5}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "📦 Volumen Total Captado",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_total_liters\")\n  |> last()"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "displayName": "Litros",
+          "color": {"fixedColor": "#2196F3", "mode": "fixed"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#2196F3", "value": null}]}
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "🔧 Ciclos de Válvulas",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()",
+          "legendFormat": "Admisión"
+        },
+        {
+          "refId": "B",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()",
+          "legendFormat": "Rechazo"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#4CAF50", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Rechazo"},
+            "properties": [{"id": "color", "value": {"fixedColor": "#FF9800", "mode": "fixed"}}]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "title": "🤖 Autonomía Hídrica (IA)",
+      "description": "Predicción del modelo ML. Requiere tabla autonomy_predictions en PostgreSQL.",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "rawSql": "SELECT days_autonomy AS value, created_at AS time FROM autonomy_predictions WHERE node_id = '${device_id}' ORDER BY created_at DESC LIMIT 1",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "displayName": "días",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#F44336", "value": null},
+              {"color": "#FF9800", "value": 2},
+              {"color": "#FFC107", "value": 4},
+              {"color": "#4CAF50", "value": 7}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "📈 Turbidez en el Tiempo — NOM-127-SSA1-1994 (5 NTU)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "legendFormat": "Turbidez (NTU)"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "single"},
+        "fillOpacity": 20,
+        "gradientMode": "opacity",
+        "thresholdsStyle": {"mode": "area"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {"fixedColor": "#2196F3", "mode": "fixed"},
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {"mode": "area"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "rgba(76,175,80,0.15)", "value": null},
+              {"color": "rgba(255,152,0,0.15)",  "value": 5},
+              {"color": "rgba(255,87,34,0.20)",  "value": 15},
+              {"color": "rgba(244,67,54,0.25)",  "value": 50}
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Límite NOM-127 (5 NTU)"},
+            "properties": [
+              {"id": "color", "value": {"fixedColor": "#4CAF50", "mode": "fixed"}},
+              {"id": "custom.lineStyle", "value": {"dash": [8, 4], "fill": "dash"}},
+              {"id": "custom.lineWidth", "value": 1},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "title": "📊 Flujo (L/min) y Nivel de Cisterna (%)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "legendFormat": "Flujo (L/min)"
+        },
+        {
+          "refId": "B",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "legendFormat": "Nivel Cisterna (%)"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {"lineWidth": 2, "fillOpacity": 15}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Flujo (L/min)"},
+            "properties": [
+              {"id": "color", "value": {"fixedColor": "#4CAF50", "mode": "fixed"}},
+              {"id": "custom.fillOpacity", "value": 30},
+              {"id": "unit", "value": "Lpm"}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Nivel Cisterna (%)"},
+            "properties": [
+              {"id": "color", "value": {"fixedColor": "#2196F3", "mode": "fixed"}},
+              {"id": "unit", "value": "percent"},
+              {"id": "custom.axisPlacement", "value": "right"}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "title": "⏱️ Tiempo en Cada Estado FSM",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state_duration_ms\")\n  |> group(columns: [\"fsm_state\"])\n  |> sum()\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0 / 60.0}))"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "fillOpacity": 100,
+        "legend": {"displayMode": "list", "placement": "bottom"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "decimals": 1,
+          "color": {"mode": "palette-classic"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "🗺️ Mapa de Nodos Hydro-V — Nezahualcóyotl",
+      "type": "geomap",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "rawSql": "SELECT device_id, name, lat AS latitude, lon AS longitude, is_active, last_seen, CASE WHEN last_seen > NOW() - INTERVAL '30 seconds' THEN 'online' WHEN last_seen > NOW() - INTERVAL '5 minutes' THEN 'warning' ELSE 'offline' END AS status FROM devices WHERE is_active = true",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 19.4136,
+          "lon": -99.0151,
+          "zoom": 13
+        },
+        "basemap": {
+          "type": "xyz",
+          "config": {
+            "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            "attribution": "CartoDB Dark Matter"
+          }
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Nodos Hydro-V",
+            "config": {
+              "style": {
+                "size": {"fixed": 10},
+                "color": {"field": "status", "fixed": "#2196F3"},
+                "symbol": {"fixed": "img/icons/marker/circle.svg"},
+                "fillOpacity": 0.9
+              },
+              "showTooltip": true
+            }
+          }
+        ],
+        "tooltip": {"mode": "details"}
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "status"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {"type": "value", "options": {"online":  {"color": "#4CAF50"}}},
+                  {"type": "value", "options": {"warning": {"color": "#FF9800"}}},
+                  {"type": "value", "options": {"offline": {"color": "#F44336"}}}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "🚨 Alertas de Emergencia Recientes",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
+      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "rawSql": "SELECT node_id AS \"Nodo\", timestamp AT TIME ZONE 'America/Mexico_City' AS \"Hora (CDMX)\", error_count AS \"Errores\", state_duration_ms / 1000 AS \"Duración (s)\", resolved AS \"Resuelta\" FROM emergency_alerts ORDER BY timestamp DESC LIMIT 20",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "sortBy": [{"displayName": "Hora (CDMX)", "desc": true}],
+        "footer": {"show": false}
+      },
+      "fieldConfig": {
+        "defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Resuelta"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {"type": "value", "options": {"true":  {"text": "✅ Sí", "color": "#4CAF50"}}},
+                  {"type": "value", "options": {"false": {"text": "🚨 No", "color": "#F44336"}}}
+                ]
+              },
+              {"id": "custom.displayMode", "value": "color-background"}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Errores"},
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"color": "#4CAF50", "value": null},
+                    {"color": "#FF9800", "value": 1},
+                    {"color": "#F44336", "value": 4}
+                  ]
+                }
+              },
+              {"id": "custom.displayMode", "value": "color-background"}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

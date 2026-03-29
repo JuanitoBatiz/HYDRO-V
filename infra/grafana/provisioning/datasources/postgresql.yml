@@ -1,0 +1,23 @@
+# infra/grafana/provisioning/datasources/postgresql.yml
+# ─────────────────────────────────────────────────────────────────
+#  Datasource de PostgreSQL para Grafana — Hydro-V
+#  Usado para: mapa de nodos, alertas, predicciones IA
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: 1
+
+datasources:
+  - name: HydroV-PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: ${POSTGRES_DB:-hydrov}
+    user: ${POSTGRES_USER:-hydrov}
+    isDefault: false
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    editable: false

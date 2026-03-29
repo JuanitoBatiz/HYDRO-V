@@ -1,0 +1,175 @@
+{
+  "title": "🔬 HYDRO-V — Node Deep Dive",
+  "uid": "hydrov-node-deep-dive",
+  "description": "Análisis profundo de un nodo individual. Timeline FSM, estadísticas de sesión y eficiencia de captación.",
+  "tags": ["hydrov", "node", "analysis"],
+  "timezone": "America/Mexico_City",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-6h", "to": "now"},
+  "links": [
+    {"title": "← Mission Control", "url": "/d/hydrov-mission-control", "type": "link", "icon": "arrow-left"}
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "device_id",
+        "label": "Nodo",
+        "type": "query",
+        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "query": "SELECT device_id FROM devices WHERE is_active = true ORDER BY device_id",
+        "current": {"text": "HYDRO-V-001", "value": "HYDRO-V-001"},
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "⏱️ Timeline de Estados FSM",
+      "description": "Evolución temporal del estado del sistema. Muestra cuándo y cuánto tiempo estuvo en cada estado.",
+      "type": "state-timeline",
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state\")\n  |> aggregateWindow(every: 5s, fn: last)\n  |> fill(usePrevious: true)",
+          "legendFormat": "Estado FSM"
+        }
+      ],
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "center",
+        "rowHeight": 0.9,
+        "legend": {"displayMode": "list", "placement": "bottom"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#9E9E9E", "value": null}]},
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "IDLE":      {"text": "IDLE",            "color": "#9E9E9E", "index": 0},
+                "ANALYZING": {"text": "ANALIZANDO",      "color": "#2196F3", "index": 1},
+                "HARVESTING":{"text": "COSECHANDO",      "color": "#4CAF50", "index": 2},
+                "FULL_TANK": {"text": "CISTERNA LLENA",  "color": "#00BCD4", "index": 3},
+                "EMERGENCY": {"text": "EMERGENCIA",      "color": "#F44336", "index": 4}
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "📋 Estadísticas de la Sesión",
+      "description": "Métricas calculadas para el rango de tiempo seleccionado.",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 14, "x": 0, "y": 6},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\" or r._field == \"flow_lpm\" or r._field == \"flow_total_liters\" or r._field == \"intake_cycles\" or r._field == \"reject_cycles\")\n  |> group(columns: [\"_field\"])\n  |> reduce(\n      fn: (r, accumulator) => ({\n          min:   (r._value < accumulator.min) ? r._value : accumulator.min,\n          max:   (r._value > accumulator.max) ? r._value : accumulator.max,\n          sum:   accumulator.sum + r._value,\n          count: accumulator.count + 1.0\n      }),\n      identity: {min: 9999.0, max: -9999.0, sum: 0.0, count: 0.0}\n  )\n  |> map(fn: (r) => ({r with mean: r.sum / r.count}))",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "footer": {"show": false},
+        "sortBy": []
+      },
+      "fieldConfig": {
+        "defaults": {"decimals": 2}
+      }
+    },
+    {
+      "id": 3,
+      "title": "✅ Eficiencia de Captación",
+      "description": "Porcentaje de ciclos exitosos vs rechazados. > 90% = óptimo para condiciones de lluvia urbana.",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 10, "x": 14, "y": 6},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "intake = from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()\n\nreject = from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()\n\njoin(\n  tables: {intake: intake, reject: reject},\n  on: [\"_time\", \"node_id\"]\n)\n  |> map(fn: (r) => ({\n      r with\n      _value: if (r._value_intake + r._value_reject) > 0.0\n              then r._value_intake / (r._value_intake + r._value_reject) * 100.0\n              else 0.0\n  }))",
+          "legendFormat": "Eficiencia %"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#F44336", "value": null},
+              {"color": "#FF9800", "value": 50},
+              {"color": "#FFC107", "value": 70},
+              {"color": "#4CAF50", "value": 90}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "🌡️ Comparativa Turbidez vs Flujo",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "legendFormat": "Turbidez (NTU)"
+        },
+        {
+          "refId": "B",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: $__timeFrom(), stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "legendFormat": "Flujo (L/min)"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "min": 0, "custom": {"lineWidth": 2}},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Turbidez (NTU)"},
+            "properties": [
+              {"id": "color", "value": {"fixedColor": "#FF9800", "mode": "fixed"}},
+              {"id": "custom.axisPlacement", "value": "left"}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Flujo (L/min)"},
+            "properties": [
+              {"id": "color", "value": {"fixedColor": "#2196F3", "mode": "fixed"}},
+              {"id": "custom.axisPlacement", "value": "right"},
+              {"id": "unit", "value": "Lpm"}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

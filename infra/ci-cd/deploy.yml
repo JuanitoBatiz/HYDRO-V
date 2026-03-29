@@ -1,0 +1,143 @@
+name: Hydro-V CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Job 1: Tests del backend ────────────────────────────────────
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias de desarrollo
+        working-directory: hydrov-backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Crear .env de prueba
+        working-directory: hydrov-backend
+        run: |
+          cat > .env << EOF
+          DEBUG=True
+          ENVIRONMENT=test
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          POSTGRES_USER=hydrov
+          POSTGRES_PASSWORD=test_password
+          POSTGRES_DB=hydrov_test
+          INFLUX_URL=http://localhost:8086
+          INFLUX_TOKEN=test_token
+          INFLUX_ORG=hydrov
+          INFLUX_BUCKET_TELEMETRY=sensor_telemetry
+          INFLUX_BUCKET_NASA=nasa_weather_cache
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          MQTT_HOST=test.hivemq.cloud
+          MQTT_PORT=8883
+          MQTT_USER=test
+          MQTT_PASSWORD=test_password
+          SECRET_KEY=test_secret_key_that_is_long_enough_for_jwt_hs256
+          EOF
+
+      - name: Ejecutar tests con coverage
+        working-directory: hydrov-backend
+        run: |
+          pytest --cov=app --cov-report=xml --cov-report=term-missing -v
+
+      - name: Subir reporte de coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: hydrov-backend/coverage.xml
+          flags: backend
+
+  # ── Job 2: Linting ─────────────────────────────────────────────
+  lint-backend:
+    name: Backend Lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff
+      - name: Ruff lint
+        working-directory: hydrov-backend
+        run: ruff check app/ tests/
+
+  # ── Job 3: Build Docker images ──────────────────────────────────
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-backend]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./hydrov-backend
+          file: ./infra/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+
+      - name: Build y push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./hydrov-frontend
+          file: ./infra/docker/frontend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:latest
+            ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+
+  # ── Job 4: Deploy a staging ─────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy vía SSH a staging
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key:      ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd ~/hydro-v
+            git pull origin main
+            ./hydrov-backend/scripts/deploy.sh staging

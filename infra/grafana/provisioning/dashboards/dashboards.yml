@@ -1,0 +1,18 @@
+# infra/grafana/provisioning/dashboards/dashboards.yml
+# ─────────────────────────────────────────────────────────────────
+#  Le dice a Grafana dónde encontrar los JSON de dashboards.
+#  Se cargan automáticamente al arrancar el contenedor.
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: 1
+
+providers:
+  - name: HydroV Dashboards
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
