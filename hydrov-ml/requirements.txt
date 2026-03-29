@@ -1,0 +1,11 @@
+# Framework principal de IA
+torch
+# Para las Graph Neural Networks (GNN)
+torch_geometric
+# Manipulación y análisis de datos
+pandas
+numpy
+# Para la conexión con la API de la NASA POWER
+requests
+# Herramientas adicionales de ML
+scikit-learn

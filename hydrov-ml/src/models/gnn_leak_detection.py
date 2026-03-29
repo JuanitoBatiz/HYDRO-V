@@ -1,95 +1,122 @@
-# hydrov-ml/src/models/gnn_leak_detection.py
-"""
-Red Neuronal para detección de fugas en nodos Hydro-V.
+# ============================================================
+#  Hydro-V · Detección de Fugas con Graph Neural Network
+#  Archivo: src/models/gnn_leak_detection.py
+#  Arquitectura: GraphSAGE (SAGEConv) — 3 capas
+# ============================================================
 
-Arquitectura: MLP simple (placeholder para la GNN real de Emma).
-Entrada dinámica: [flow_lpm, level_pct] del nodo + vecinos.
-Salida: escalar 0.0–1.0 (score de anomalía).
+from __future__ import annotations
 
-Cuando haya múltiples nodos, Emma implementará la GNN completa
-con torch_geometric. Este modelo sirve como puente mientras tanto.
-
-Input shape: (batch, 2 + 2*num_neighbors)
-Output shape: (batch, 1)
-"""
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import SAGEConv
 
 
-class LeakDetectorMLP(nn.Module):
+class HydroGNN(nn.Module):
     """
-    MLP para detección de anomalías de flujo.
+    Graph Neural Network para detección de fugas en la red hídrica.
 
-    Diseñado para funcionar con cualquier número de vecinos:
-    - 0 vecinos: input_dim = 2  (solo nodo local)
-    - 1 vecino:  input_dim = 4
-    - N vecinos: input_dim = 2 + 2*N
+    Cada nodo representa un sensor Hydro-V con 8 características:
+        [turbidez_norm, flujo_norm, nivel_norm, presion_est,
+         delta_turbidez, delta_flujo, hora_sin, hora_cos]
 
-    La capa de entrada es flexible — se adapta al tamaño del input
-    en el forward pass mediante padding si es necesario.
+    Las aristas representan conectividad hidráulica entre nodos.
+
+    Arquitectura:
+        SAGEConv(8 → 64) → ReLU → Dropout(0.3)
+        SAGEConv(64 → 32) → ReLU → Dropout(0.3)
+        SAGEConv(32 → 16) → ReLU
+        Linear(16 → 8)   → ReLU
+        Linear(8  → 2)   → log_softmax
     """
 
-    # Dimensión máxima fija (nodo local + hasta 4 vecinos)
-    MAX_INPUT_DIM = 10  # 2 + 2*4
-
-    def __init__(self, hidden_dim: int = 32):
+    def __init__(
+        self,
+        in_channels: int = 8,
+        hidden_ch: int = 64,
+        num_classes: int = 2,
+        dropout: float = 0.3,
+    ) -> None:
         super().__init__()
 
-        self.network = nn.Sequential(
-            nn.Linear(self.MAX_INPUT_DIM, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 1),
-            nn.Sigmoid(),   # output entre 0 y 1
-        )
+        # ── GNN Layers (GraphSAGE) ────────────────────────────
+        self.conv1 = SAGEConv(in_channels, hidden_ch)
+        self.conv2 = SAGEConv(hidden_ch, 32)
+        self.conv3 = SAGEConv(32, 16)
 
-        # Inicializar pesos con valores conservadores
-        # (sesgo hacia "no fuga" para evitar falsos positivos)
+        # ── Fully Connected Layers ────────────────────────────
+        self.fc1 = nn.Linear(16, 8)
+        self.fc2 = nn.Linear(8, num_classes)
+
+        self.dropout = dropout
+
         self._init_weights()
 
+    # ── Inicialización de pesos ───────────────────────────────
     def _init_weights(self):
-        """Inicialización conservadora: scores cercanos a 0.1 (sin fuga)."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight, gain=0.1)
+                nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
-                    nn.init.constant_(module.bias, -2.0)  # sesgo hacia 0 inicial
+                    nn.init.zeros_(module.bias)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # ── Forward pass ──────────────────────────────────────────
+    def forward(
+        self,
+        x: torch.Tensor,
+        edge_index: torch.Tensor
+    ) -> torch.Tensor:
         """
-        Forward pass con padding automático al MAX_INPUT_DIM.
-
         Args:
-            x: Tensor de shape (batch, n_features) donde n_features puede variar.
+            x: [num_nodos, in_channels]
+            edge_index: [2, num_aristas]
 
         Returns:
-            Tensor de shape (batch, 1) con scores de anomalía.
+            log-probabilidades [num_nodos, num_classes]
         """
-        batch_size, n_features = x.shape
 
-        # Padding con ceros si hay menos features que MAX_INPUT_DIM
-        if n_features < self.MAX_INPUT_DIM:
-            padding = torch.zeros(
-                batch_size,
-                self.MAX_INPUT_DIM - n_features,
-                dtype=x.dtype,
-                device=x.device,
-            )
-            x = torch.cat([x, padding], dim=1)
-        elif n_features > self.MAX_INPUT_DIM:
-            # Truncar si hay más vecinos de los esperados
-            x = x[:, :self.MAX_INPUT_DIM]
+        # ── Capa 1 ────────────────────────────────────────────
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
-        return self.network(x)
+        # ── Capa 2 ────────────────────────────────────────────
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+
+        # ── Capa 3 ────────────────────────────────────────────
+        x = self.conv3(x, edge_index)
+        x = F.relu(x)
+
+        # ── Clasificador ──────────────────────────────────────
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+
+        return F.log_softmax(x, dim=1)
 
 
-def build_model(hidden_dim: int = 32) -> LeakDetectorMLP:
-    """
-    Construye e inicializa el modelo de detección de fugas.
-    Retorna el modelo en modo eval() listo para inferencia.
-    """
-    model = LeakDetectorMLP(hidden_dim=hidden_dim)
+# ── Test rápido ───────────────────────────────────────────────
+if __name__ == "__main__":
+    print("🧠 Test rápido de HydroGNN")
+
+    num_nodos = 10
+    num_features = 8
+
+    # Features aleatorias
+    x = torch.rand((num_nodos, num_features))
+
+    # Grafo simple (cadena)
+    edge_index = torch.tensor([
+        [0, 1, 2, 3, 4, 5, 6, 7, 8],
+        [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ], dtype=torch.long)
+
+    model = HydroGNN()
     model.eval()
-    return model
+
+    with torch.no_grad():
+        out = model(x, edge_index)
+
+    print("Output shape:", out.shape)  # [num_nodos, 2]
+    print("Ejemplo salida:", out[0])

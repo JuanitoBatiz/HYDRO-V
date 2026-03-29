@@ -1,63 +1,146 @@
-# hydrov-ml/src/inference/detect_leaks.py
+# ============================================================
+#  Hydro-V · Inferencia — Detección de Fugas con GNN + Fallback
+#  Archivo: src/inference/detect_leaks.py
+# ============================================================
+
+from __future__ import annotations
+
 import torch
 import numpy as np
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "gnn_leak_detector_best.pth"
+from src.models.gnn_leak_detection import HydroGNN
+from src.data.synthetic_generator import construir_grafo_instantaneo
 
-# Umbral de anomalía para clasificar como fuga
-LEAK_THRESHOLD = 0.75
-
-
-def load_model():
-    model = torch.load(MODEL_PATH, map_location=torch.device("cpu"))
-    model.eval()
-    return model
+# Fallback opcional (modelo ligero)
+try:
+    from src.models.mlp_leak_detection import build_model as build_mlp
+except ImportError:
+    build_mlp = None
 
 
-# Modelo cargado una sola vez al importar
-_model = load_model()
+# ── Configuración ─────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MODEL_PATH = BASE_DIR / "models" / "gnn_leak_detector_best.pth"
+
+UMBRAL_ANOMALIA = 0.75
+IN_CHANNELS = 8
 
 
-def detect_leak(
-    node_id:      str,
-    flow_lpm:     float,          # Flujo actual del nodo
-    level_pct:    float,          # Nivel actual de cisterna
-    neighbor_flows: list[float],  # Flujos de nodos vecinos (para GNN)
-    neighbor_levels: list[float], # Niveles de nodos vecinos
-) -> dict:
+@dataclass
+class AnomaliaDetectada:
+    device_id: str
+    probabilidad: float
+    severidad: str
+    detectado_en: str
+
+
+class LeakDetector:
     """
-    Detecta anomalías de flujo que podrían indicar fugas en la red.
-    Usa la GNN para correlacionar con nodos vecinos.
-
-    Retorna:
-        {
-            "node_id":        str,
-            "leak_detected":  bool,
-            "anomaly_score":  float,   # 0.0 a 1.0
-            "confidence":     float,
-        }
+    Detector híbrido:
+    - Usa GNN para análisis completo de red
+    - Puede usar MLP como fallback si el modelo no está disponible
     """
-    # Construir features del nodo central + vecinos
-    node_features = [flow_lpm, level_pct]
-    neighbor_features = []
 
-    for f, l in zip(neighbor_flows, neighbor_levels):
-        neighbor_features.extend([f, l])
+    def __init__(
+        self,
+        model_path: Path = MODEL_PATH,
+        use_gnn: bool = True
+    ) -> None:
 
-    # Si no hay vecinos, inferencia solo con nodo local
-    all_features = node_features + neighbor_features
-    x = torch.tensor([all_features], dtype=torch.float32)
+        self.use_gnn = use_gnn
+        self.model = None
 
-    with torch.no_grad():
-        score = float(_model(x).squeeze())
+        if use_gnn:
+            try:
+                self.model = HydroGNN(in_channels=IN_CHANNELS)
+                self.model.load_state_dict(
+                    torch.load(model_path, map_location="cpu")
+                )
+                print(f"[LeakDetector] GNN cargada desde: {model_path}")
 
-    score = max(0.0, min(1.0, score))  # clamp entre 0 y 1
+            except FileNotFoundError:
+                print("⚠️ Modelo GNN no encontrado. Usando fallback MLP...")
+                self._load_mlp()
 
-    return {
-        "node_id":       node_id,
-        "leak_detected": score >= LEAK_THRESHOLD,
-        "anomaly_score": round(score, 4),
-        "confidence":    0.80,   # placeholder hasta tener métricas reales
-    }
+        else:
+            self._load_mlp()
+
+        self.model.eval()
+
+    def _load_mlp(self):
+        if build_mlp is None:
+            raise RuntimeError("No hay modelo disponible (ni GNN ni MLP).")
+
+        self.model = build_mlp()
+        print("[LeakDetector] Usando modelo MLP (fallback)")
+
+    def detectar(self, df_red) -> list[AnomaliaDetectada]:
+        grafo = construir_grafo_instantaneo(df_red)
+
+        with torch.no_grad():
+            if self.use_gnn:
+                logits = self.model(grafo.x, grafo.edge_index)
+                probs = torch.exp(logits)
+                prob_anomalia = probs[:, 1].numpy()
+
+            else:
+                # Fallback simple: inferencia nodo por nodo
+                prob_anomalia = []
+                for node_features in grafo.x:
+                    score = float(self.model(node_features.unsqueeze(0)))
+                    prob_anomalia.append(score)
+
+                prob_anomalia = np.array(prob_anomalia)
+
+        anomalias = []
+        timestamp_iso = datetime.now(timezone.utc).isoformat() + "Z"
+
+        for i, prob in enumerate(prob_anomalia):
+            if prob >= UMBRAL_ANOMALIA:
+                node_id = i + 2
+                anomalias.append(
+                    AnomaliaDetectada(
+                        device_id=f"HYDRO-V-{node_id:03d}",
+                        probabilidad=float(prob),
+                        severidad="ALTA" if prob >= 0.90 else "MEDIA",
+                        detectado_en=timestamp_iso,
+                    )
+                )
+
+        return anomalias
+
+
+# ── Test manual ───────────────────────────────────────────────
+if __name__ == "__main__":
+    from src.data.synthetic_generator import generar_red_completa
+
+    print("==================================================")
+    print("🌐 HYDRO-V: ESCÁNER DE RED (GNN + FALLBACK)")
+    print("==================================================")
+
+    try:
+        detector = LeakDetector()
+
+        print("📡 Simulando telemetría...")
+        df_red_simulada = generar_red_completa(dias=1)
+
+        print("🧠 Ejecutando inferencia...")
+        alertas = detector.detectar(df_red_simulada)
+
+        print("\n==================================================")
+        print("🚨 REPORTE DE FUGAS")
+        print("==================================================")
+
+        if not alertas:
+            print("✅ Sin anomalías detectadas.")
+        else:
+            print(f"⚠️ {len(alertas)} posibles fugas:")
+            for alerta in alertas:
+                print(f"📍 {alerta.device_id} | {alerta.probabilidad:.1%} | {alerta.severidad}")
+
+    except Exception as e:
+        print(f"🛑 Error en inferencia: {e}")
