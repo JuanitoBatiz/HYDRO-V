@@ -1,0 +1,35 @@
+# infra/grafana/provisioning/datasources/influxdb.yml
+# ─────────────────────────────────────────────────────────────────
+#  Provisioning automático del datasource de InfluxDB en Grafana.
+#  Grafana lo carga al arrancar — no se necesita configurar en la UI.
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB — Telemetría
+    type: influxdb
+    access: proxy
+    url: ${INFLUX_URL}
+    isDefault: true
+    jsonData:
+      version:      Flux          # Usar Flux query language (InfluxDB 2.x)
+      organization: ${INFLUX_ORG}
+      defaultBucket: sensor_telemetry
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUX_TOKEN}
+    editable: false
+
+  - name: InfluxDB — NASA POWER
+    type: influxdb
+    access: proxy
+    url: ${INFLUX_URL}
+    jsonData:
+      version:      Flux
+      organization: ${INFLUX_ORG}
+      defaultBucket: nasa_weather_cache
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUX_TOKEN}
+    editable: false

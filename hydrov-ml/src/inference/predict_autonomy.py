@@ -5,43 +5,46 @@
 
 from __future__ import annotations
 
-import pickle
 import numpy as np
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from src.models.linear_autonomy import AutonomyPredictor
 
-MODEL_PATH = "models/linear_autonomy.pkl"
+
+# ── Configuración ─────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MODEL_PATH = BASE_DIR / "models" / "linear_autonomy.pkl"
 
 
 @dataclass
 class PrediccionAutonomia:
-    """Resultado de la predicción de autonomía para un nodo."""
     device_id: str
     dias_restantes: float
-    fecha_proxima_recarga: str   # ISO 8601
+    fecha_proxima_recarga: str
     confianza: float
     nivel_actual_litros: float
 
 
 class AutonomyInference:
     """
-    Carga el modelo de regresión lineal y predice días de autonomía.
+    Predicción profesional de autonomía hídrica.
 
-    Uso:
-        predictor = AutonomyInference()
-        resultado = predictor.predecir(
-            device_id="HYDRO-V-001",
-            nivel_actual_litros=550.0,
-            consumo_7d_lpm=2.3,
-            consumo_30d_lpm=2.1,
-            precipitacion_mm=0.0,
-        )
+    - Usa modelo entrenado (regresión lineal)
+    - Retorna datos listos para API/backend
+    - Incluye fecha estimada de agotamiento
     """
 
-    def __init__(self, model_path: str = MODEL_PATH) -> None:
-        self.predictor = AutonomyPredictor.load(model_path)
+    def __init__(self, model_path: Path = MODEL_PATH) -> None:
+        try:
+            self.predictor = AutonomyPredictor.load(str(model_path))
+            print(f"[AutonomyInference] Modelo cargado desde: {model_path}")
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"No se encontró el modelo en {model_path}. "
+                "Ejecuta primero el entrenamiento."
+            )
 
     def predecir(
         self,
@@ -51,64 +54,53 @@ class AutonomyInference:
         consumo_30d_lpm: float,
         precipitacion_mm: float = 0.0,
     ) -> PrediccionAutonomia:
-        """
-        Predice cuántos días de agua quedan en la cisterna.
 
-        Args:
-            device_id            : ID del dispositivo (ej. "HYDRO-V-001").
-            nivel_actual_litros  : Litros actuales en la cisterna.
-            consumo_7d_lpm       : Promedio de consumo últimos 7 días (L/min).
-            consumo_30d_lpm      : Promedio de consumo últimos 30 días (L/min).
-            precipitacion_mm     : Lluvia pronosticada (mm) — de NASA POWER API.
-
-        Returns:
-            PrediccionAutonomia con días restantes y fecha estimada.
-        """
         ahora = datetime.now(timezone.utc)
+
         X = np.array([[
             nivel_actual_litros,
             consumo_7d_lpm,
             consumo_30d_lpm,
             precipitacion_mm,
-            ahora.weekday(),   # 0=lunes … 6=domingo
+            ahora.weekday(),
             ahora.month,
         ]])
 
         dias = float(self.predictor.predict(X)[0])
+        dias = max(0.0, dias)  # seguridad
+
         fecha_recarga = (ahora + timedelta(days=dias)).date().isoformat()
 
         return PrediccionAutonomia(
             device_id=device_id,
             dias_restantes=round(dias, 2),
             fecha_proxima_recarga=fecha_recarga,
-            confianza=0.89,   # Actualizar con R² real tras entrenar
+            confianza=0.89,  # TODO: reemplazar con métrica real
             nivel_actual_litros=nivel_actual_litros,
         )
+
+
+# ── Test manual ───────────────────────────────────────────────
 if __name__ == "__main__":
+    print("=========================================")
+    print("🤖 HYDRO-V · PREDICCIÓN DE AUTONOMÍA")
+    print("=========================================")
+
     try:
-        # Instanciamos el cerebro de predicción
         predictor = AutonomyInference()
-        
-        # Le pasamos un escenario simulado (ej. tinaco a la mitad, sin lluvia)
+
         resultado = predictor.predecir(
             device_id="HYDRO-V-NEZA-001",
-            nivel_actual_litros=550.0,  
-            consumo_7d_lpm=2.3,         
+            nivel_actual_litros=550.0,
+            consumo_7d_lpm=2.3,
             consumo_30d_lpm=2.1,
-            precipitacion_mm=0.0        
+            precipitacion_mm=0.0
         )
-        
-        print("=========================================")
-        print("🤖 PREDICCIÓN DE AUTONOMÍA HYDRO-V")
-        print("=========================================")
-        print(f"📍 Nodo: {resultado.device_id}")
-        print(f"💧 Nivel Actual: {resultado.nivel_actual_litros} Litros")
-        print(f"⏳ Días Restantes: {resultado.dias_restantes} días")
-        print(f"📅 Fecha en que se vacía: {resultado.fecha_proxima_recarga}")
-        print("=========================================")
-        
-    except FileNotFoundError:
-        print("🛑 ¡Falta de entrenamiento! El archivo models/linear_autonomy.pkl no existe.")
-        print("Necesitamos entrenar la Regresión Lineal primero.")
 
-    
+        print(f"📍 Nodo: {resultado.device_id}")
+        print(f"💧 Nivel: {resultado.nivel_actual_litros} L")
+        print(f"⏳ Días restantes: {resultado.dias_restantes}")
+        print(f"📅 Fecha estimada: {resultado.fecha_proxima_recarga}")
+
+    except Exception as e:
+        print(f"🛑 Error: {e}")
