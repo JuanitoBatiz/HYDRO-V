@@ -96,27 +96,106 @@ class HydroGNN(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
+# ─────────────────────────────────────────────────────────────
+#  LeakDetectorMLP — Fallback ligero para inferencia por nodo
+# ─────────────────────────────────────────────────────────────
+
+class LeakDetectorMLP(nn.Module):
+    """
+    MLP ligero para detección de fugas en un nodo individual.
+
+    Se usa como fallback cuando la GNN (que requiere el grafo
+    completo de 50 nodos) no está disponible o cuando se quiere
+    inferencia rápida con solo los datos del nodo local.
+
+    Input: vector de MAX_INPUT_DIM features (10 dimensiones):
+        [flow_lpm_norm, level_pct_norm, avg_neighbor_flow_norm,
+         avg_neighbor_level_norm, flow_deviation, level_deviation,
+         is_low_level, is_high_flow_low_level, pad0, pad1]
+
+    Output: probabilidad de fuga [0.0, 1.0]
+
+    Arquitectura:
+        Linear(10 → hidden_dim) → ReLU → Dropout(0.2)
+        Linear(hidden_dim → 16) → ReLU
+        Linear(16 → 1)          → Sigmoid
+    """
+
+    MAX_INPUT_DIM: int = 10
+
+    def __init__(
+        self,
+        input_dim: int = MAX_INPUT_DIM,
+        hidden_dim: int = 32,
+    ) -> None:
+        super().__init__()
+
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, 1),
+            nn.Sigmoid(),
+        )
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: [batch_size, MAX_INPUT_DIM]
+        Returns:
+            probabilidad de fuga [batch_size, 1]  ∈ [0.0, 1.0]
+        """
+        return self.model(x)
+
+
 # ── Test rápido ───────────────────────────────────────────────
 if __name__ == "__main__":
-    print("🧠 Test rápido de HydroGNN")
+    # ── 1. HydroGNN ───────────────────────────────────────────
+    print("=" * 50)
+    print("🧠 Test HydroGNN (GraphSAGE)")
+    print("=" * 50)
 
-    num_nodos = 10
+    num_nodos    = 10
     num_features = 8
+    x_gnn        = torch.rand((num_nodos, num_features))
+    edge_index   = torch.tensor(
+        [[0, 1, 2, 3, 4, 5, 6, 7, 8],
+         [1, 2, 3, 4, 5, 6, 7, 8, 9]],
+        dtype=torch.long,
+    )
 
-    # Features aleatorias
-    x = torch.rand((num_nodos, num_features))
+    gnn = HydroGNN()
+    gnn.eval()
+    with torch.no_grad():
+        out_gnn = gnn(x_gnn, edge_index)
 
-    # Grafo simple (cadena)
-    edge_index = torch.tensor([
-        [0, 1, 2, 3, 4, 5, 6, 7, 8],
-        [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    ], dtype=torch.long)
+    print(f"Output shape : {list(out_gnn.shape)}")   # [10, 2]
+    print(f"Ejemplo nodo : {out_gnn[0].tolist()}")
 
-    model = HydroGNN()
-    model.eval()
+    # ── 2. LeakDetectorMLP ────────────────────────────────────
+    print()
+    print("=" * 50)
+    print("🤖 Test LeakDetectorMLP (fallback MLP)")
+    print("=" * 50)
+
+    mlp    = LeakDetectorMLP(hidden_dim=32)
+    mlp.eval()
+    x_mlp  = torch.rand((1, LeakDetectorMLP.MAX_INPUT_DIM))
 
     with torch.no_grad():
-        out = model(x, edge_index)
+        score = mlp(x_mlp)
 
-    print("Output shape:", out.shape)  # [num_nodos, 2]
-    print("Ejemplo salida:", out[0])
+    print(f"Score de fuga : {score.item():.4f}  (esperado ∈ [0, 1])")
+    print(f"MAX_INPUT_DIM : {LeakDetectorMLP.MAX_INPUT_DIM}")
+    print("✓ Ambos modelos operativos")

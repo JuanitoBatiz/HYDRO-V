@@ -86,11 +86,33 @@ jobs:
         working-directory: hydrov-backend
         run: ruff check app/ tests/ --output-format=github
 
+  # ── Job 2.5: Frontend Lint & Build ─────────────────────────────
+  test-frontend:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: hydrov-frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: hydrov-frontend
+        run: npm ci
+      - name: TS Check & Lint
+        working-directory: hydrov-frontend
+        run: npm run lint
+      - name: Build frontend
+        working-directory: hydrov-frontend
+        run: npm run build
+
   # ── Job 3: Build Docker images ──────────────────────────────────
   build-docker:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: [test-backend, lint]
+    needs: [test-backend, lint, test-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:

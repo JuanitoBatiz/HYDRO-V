@@ -1,0 +1,75 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: "HYDRO-V Emergency Alerts"
+    folder: "Hydro-V Control Center"
+    interval: 1m
+    rules:
+      # 1. Alerta de Fuga Crítica (PostgreSQL)
+      - uid: "leak-critical-alert"
+        title: "🚨 ML: Fuga Crítica Detectada"
+        condition: "B"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 300  # Últimos 5 minutos
+              to: 0
+            datasourceUid: "postgres-hydrov" # UID del datasource, en docker se auto-asigna si se define así. O usamos el nombre de la variable. asumo postgres-hydrov
+            model:
+              refId: "A"
+              format: "table"
+              rawSql: "SELECT COUNT(*) AS value FROM leak_detections WHERE resolved = false AND anomaly_score >= 0.85 AND detected_at > NOW() - INTERVAL '5 minutes'"
+              rawQuery: true
+          - refId: "B"
+            queryType: ""
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "math"
+              expression: "$A.value > 0"
+        noDataState: "OK"
+        execErrState: "Alerting"
+        for: "1m"
+        annotations:
+          summary: "Se detectó una fuga crítica (Score >= 0.85) en la red HYDRO-V."
+          description: "La GNN de Emma reporta actividad hidráulica altamente anómala. Activar protocolo de intervención."
+        labels:
+          severity: "critical"
+          layer: "ML"
+
+      # 2. Alerta de Cisterna Vacía (InfluxDB)
+      - uid: "cistern-empty-alert"
+        title: "💧 Nivel de Cisterna Crítico"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "hydrov-influx-telemetry"
+            model:
+              refId: "A"
+              hide: false
+              query: |-
+                from(bucket: "sensor_telemetry")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "sensor_telemetry")
+                  |> filter(fn: (r) => r._field == "distance_cm")
+                  |> map(fn: (r) => ({ r with _value: (100.0 - r._value) / 100.0 * 100.0 }))
+                  |> last()
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "math"
+              expression: "$A < 15.0"
+        noDataState: "OK"
+        execErrState: "Alerting"
+        for: "2m"
+        annotations:
+          summary: "El nivel de agua bajó del 15%."
+          description: "Alerta de sequía inminente en nodo. Verificar predicción de autonomía."
+        labels:
+          severity: "warning"
+          layer: "Telemetry"
