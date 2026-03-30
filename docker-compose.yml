@@ -48,7 +48,6 @@ services:
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
-      - ./infra/db/init_influxdb.sh:/docker-entrypoint-initdb.d/init_influxdb.sh:ro
     ports:
       - "8086:8086"
     healthcheck:

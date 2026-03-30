@@ -1,7 +1,8 @@
 # app/services/websocketservice.py
 import asyncio
 import json
-import aioredis
+# import aioredis
+import redis.asyncio as aioredis
 from fastapi import WebSocket, WebSocketDisconnect
 from app.core.config import settings
 from app.core.logger import logger

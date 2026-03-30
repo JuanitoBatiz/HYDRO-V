@@ -23,5 +23,5 @@ class Device(Base):
     # Relaciones
     telemetry_events:     Mapped[list["TelemetryEvent"]]     = relationship("TelemetryEvent",     back_populates="device")
     emergency_alerts:     Mapped[list["EmergencyAlert"]]     = relationship("EmergencyAlert",     back_populates="device")
-    autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship("AutonomyPrediction", back_populates="device")
-    leak_detections:      Mapped[list["LeakDetection"]]      = relationship("LeakDetection",      back_populates="device")
+    # autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship("AutonomyPrediction", back_populates="device")
+    # leak_detections:      Mapped[list["LeakDetection"]]      = relationship("LeakDetection",      back_populates="device")
