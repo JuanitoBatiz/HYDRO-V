@@ -28,7 +28,7 @@
         "name": "device_id",
         "label": "Nodo",
         "type": "query",
-        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
         "query": "SELECT device_id FROM devices WHERE is_active = true ORDER BY device_id",
         "current": {"text": "HYDRO-V-001", "value": "HYDRO-V-001"},
         "refresh": 2,
@@ -42,7 +42,7 @@
     "list": [
       {
         "name": "Alertas EMERGENCY",
-        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
         "rawQuery": true,
         "rawSql": "SELECT EXTRACT(EPOCH FROM timestamp) * 1000 AS time, 'EMERGENCY' AS text, node_id AS tags FROM emergency_alerts WHERE node_id = '${device_id}' AND $__timeFilter(timestamp)",
         "enable": true,
@@ -58,12 +58,12 @@
       "title": "Estado del Sistema",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
           "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state\")\n  |> last()",
-          "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"}
+          "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"}
         }
       ],
       "options": {
@@ -98,7 +98,7 @@
       "title": "💧 Nivel de Cisterna",
       "type": "gauge",
       "gridPos": {"h": 8, "w": 5, "x": 0, "y": 4},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -136,7 +136,7 @@
       "title": "🌊 Turbidez del Agua",
       "type": "gauge",
       "gridPos": {"h": 8, "w": 5, "x": 5, "y": 4},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -199,7 +199,7 @@
       "title": "🚿 Caudal Actual",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -233,7 +233,7 @@
       "title": "📦 Volumen Total Captado",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -262,7 +262,7 @@
       "title": "🔧 Ciclos de Válvulas",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -301,7 +301,7 @@
       "description": "Predicción del modelo ML. Requiere tabla autonomy_predictions en PostgreSQL.",
       "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
-      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
       "targets": [
         {
           "refId": "A",
@@ -339,7 +339,7 @@
       "title": "📈 Turbidez en el Tiempo — NOM-127-SSA1-1994 (5 NTU)",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -393,7 +393,7 @@
       "title": "📊 Flujo (L/min) y Nivel de Cisterna (%)",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -441,7 +441,7 @@
       "title": "⏱️ Tiempo en Cada Estado FSM",
       "type": "barchart",
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -470,7 +470,7 @@
       "title": "🗺️ Mapa de Nodos Hydro-V — Nezahualcóyotl",
       "type": "geomap",
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
-      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
       "targets": [
         {
           "refId": "A",
@@ -534,7 +534,7 @@
       "title": "🚨 Alertas de Emergencia Recientes",
       "type": "table",
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
-      "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+      "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
       "targets": [
         {
           "refId": "A",

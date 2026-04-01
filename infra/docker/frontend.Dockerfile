@@ -13,7 +13,7 @@ WORKDIR /app
 # Copiar manifests primero (layer cache)
 COPY package.json package-lock.json* ./
 
-RUN npm ci --prefer-offline
+RUN npm ci --prefer-offline --legacy-peer-deps
 
 # Copiar el resto del código y compilar
 COPY . .
@@ -36,7 +36,7 @@ RUN echo 'server { \
     index index.html; \
     location / { try_files $uri $uri/ /index.html; } \
     location /health { return 200 "ok"; add_header Content-Type text/plain; } \
-}' > /etc/nginx/conf.d/default.conf
+    }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 5173
 

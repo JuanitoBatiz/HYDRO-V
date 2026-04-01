@@ -16,22 +16,21 @@ services:
     container_name: hydrov-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER:     ${POSTGRES_USER:-hydrov}
+      POSTGRES_USER: ${POSTGRES_USER:-hydrov}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB:       ${POSTGRES_DB:-hydrov}
+      POSTGRES_DB: ${POSTGRES_DB:-hydrov}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/db/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hydrov} -d ${POSTGRES_DB:-hydrov}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hydrov} -d ${POSTGRES_DB:-hydrov}" ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - hydrov-net
-
 
   # ── InfluxDB 2.7 ────────────────────────────────────────────────
   influxdb:
@@ -39,11 +38,11 @@ services:
     container_name: hydrov-influxdb
     restart: unless-stopped
     environment:
-      DOCKER_INFLUXDB_INIT_MODE:        setup
-      DOCKER_INFLUXDB_INIT_USERNAME:    admin
-      DOCKER_INFLUXDB_INIT_PASSWORD:    ${INFLUX_ADMIN_PASSWORD:-admin1234}
-      DOCKER_INFLUXDB_INIT_ORG:         ${INFLUX_ORG:-hydrov}
-      DOCKER_INFLUXDB_INIT_BUCKET:      ${INFLUX_BUCKET_TELEMETRY:-sensor_telemetry}
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_ADMIN_PASSWORD:-admin1234}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-hydrov}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET_TELEMETRY:-sensor_telemetry}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
@@ -52,13 +51,12 @@ services:
     ports:
       - "8086:8086"
     healthcheck:
-      test: ["CMD", "influx", "ping"]
+      test: [ "CMD", "influx", "ping" ]
       interval: 15s
       timeout: 10s
       retries: 5
     networks:
       - hydrov-net
-
 
   # ── Redis 7.2 ───────────────────────────────────────────────────
   redis:
@@ -66,23 +64,18 @@ services:
     container_name: hydrov-redis
     restart: unless-stopped
     command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-}
-      --appendonly yes
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      redis-server --requirepass ${REDIS_PASSWORD:-} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - hydrov-net
-
 
   # ── FastAPI Backend ─────────────────────────────────────────────
   backend:
@@ -96,11 +89,11 @@ services:
     environment:
       # Sobreescribir hosts para que apunten a los contenedores
       POSTGRES_HOST: postgres
-      REDIS_HOST:    redis
-      INFLUX_URL:    http://influxdb:8086
+      REDIS_HOST: redis
+      INFLUX_URL: http://influxdb:8086
     volumes:
-      - ./hydrov-backend:/app          # hot-reload en desarrollo
-      - ./hydrov-ml:/hydrov-ml:ro      # modelos ML accesibles
+      - ./hydrov-backend:/app # hot-reload en desarrollo
+      - ./hydrov-ml:/hydrov-ml:ro # modelos ML accesibles
     ports:
       - "8000:8000"
     depends_on:
@@ -111,14 +104,13 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
     networks:
       - hydrov-net
-
 
   # ── Frontend React/Vite ─────────────────────────────────────────
   frontend:
@@ -129,14 +121,13 @@ services:
     restart: unless-stopped
     environment:
       VITE_API_URL: http://localhost:8000
-      VITE_WS_URL:  ws://localhost:8000
+      VITE_WS_URL: ws://localhost:8000
     ports:
       - "5173:5173"
     depends_on:
       - backend
     networks:
       - hydrov-net
-
 
   # ── Nginx reverse proxy ─────────────────────────────────────────
   nginx:
@@ -153,28 +144,27 @@ services:
     networks:
       - hydrov-net
 
-
   # ── Grafana — Control Center NASA Style ───────────────────────────
   grafana:
     image: grafana/grafana:10.4.0
     container_name: hydrov-grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER:     ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-hydrov2024}
-      GF_SERVER_ROOT_URL:         http://localhost:3000
-      GF_DEFAULT_THEME:           dark
-      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_DEFAULT_THEME: dark
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       # InfluxDB datasource
-      INFLUX_URL:   http://influxdb:8086
+      INFLUX_URL: http://influxdb:8086
       INFLUX_TOKEN: ${INFLUX_TOKEN}
-      INFLUX_ORG:   ${INFLUX_ORG:-hydrov}
+      INFLUX_ORG: ${INFLUX_ORG:-hydrov}
       # PostgreSQL datasource (mapa de nodos, alertas, predicciones ML)
-      POSTGRES_HOST:     postgres
-      POSTGRES_PORT:     5432
-      POSTGRES_DB:       ${POSTGRES_DB:-hydrov}
-      POSTGRES_USER:     ${POSTGRES_USER:-hydrov}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-hydrov}
+      POSTGRES_USER: ${POSTGRES_USER:-hydrov}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - grafana_data:/var/lib/grafana
@@ -186,13 +176,12 @@ services:
       influxdb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
       - hydrov-net
-
 
 # ── Volúmenes persistentes ────────────────────────────────────────
 volumes:
@@ -206,7 +195,6 @@ volumes:
     driver: local
   grafana_data:
     driver: local
-
 
 # ── Red interna ───────────────────────────────────────────────────
 networks:

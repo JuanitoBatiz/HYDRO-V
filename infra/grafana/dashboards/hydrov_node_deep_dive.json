@@ -17,7 +17,7 @@
         "name": "device_id",
         "label": "Nodo",
         "type": "query",
-        "datasource": {"type": "postgres", "uid": "${DS_HYDROV-POSTGRESQL}"},
+        "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
         "query": "SELECT device_id FROM devices WHERE is_active = true ORDER BY device_id",
         "current": {"text": "HYDRO-V-001", "value": "HYDRO-V-001"},
         "refresh": 2,
@@ -33,7 +33,7 @@
       "description": "Evolución temporal del estado del sistema. Muestra cuándo y cuánto tiempo estuvo en cada estado.",
       "type": "state-timeline",
       "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -73,7 +73,7 @@
       "description": "Métricas calculadas para el rango de tiempo seleccionado.",
       "type": "table",
       "gridPos": {"h": 8, "w": 14, "x": 0, "y": 6},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -95,7 +95,7 @@
       "description": "Porcentaje de ciclos exitosos vs rechazados. > 90% = óptimo para condiciones de lluvia urbana.",
       "type": "gauge",
       "gridPos": {"h": 8, "w": 10, "x": 14, "y": 6},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
@@ -133,7 +133,7 @@
       "title": "🌡️ Comparativa Turbidez vs Flujo",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
-      "datasource": {"type": "influxdb", "uid": "${DS_HYDROV-TIMESERIES}"},
+      "datasource": {"type": "influxdb", "uid": "hydrov-influx-telemetry"},
       "targets": [
         {
           "refId": "A",
