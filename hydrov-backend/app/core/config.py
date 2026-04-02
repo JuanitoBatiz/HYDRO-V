@@ -1,4 +1,3 @@
-# app/core/config.py
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
@@ -99,21 +98,6 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """
-    Instancia singleton de Settings.
-    Usar con FastAPI Depends() o importar directamente.
-
-    Ejemplo en un endpoint:
-        from app.core.config import get_settings
-        settings = get_settings()
-
-    Ejemplo con Depends:
-        from fastapi import Depends
-        def my_endpoint(settings: Settings = Depends(get_settings)):
-            ...
-    """
     return Settings()
 
-
-# Instancia global para importar directamente en services
 settings = get_settings()

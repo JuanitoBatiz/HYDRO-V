@@ -45,10 +45,14 @@ async def lifespan(app: FastAPI):
     app.state.pg_pool = _pg_pool
     logger.info("[Startup] PostgreSQL pool listo ✓")
 
-    # ── 2. SQLAlchemy tables (dev only — en prod usa Alembic) ─────
-    if settings.ENVIRONMENT == "development":
-        await init_db()
-        logger.info("[Startup] Tablas PostgreSQL sincronizadas ✓")
+    # ── 2. Tablas Alembic y Seed Catalyst v2.0 ─────────────────────
+    from app.seed import run_seed
+    try:
+        async with _pg_pool.acquire() as db:
+            await run_seed(db)
+        logger.info("[Startup] Seed de catálogos v2.0 inyectado ✓")
+    except Exception as e:
+        logger.error(f"[Startup] Error ejecutando seed: {e}")
 
     # ── 3. InfluxDB async client ──────────────────────────────────
     logger.info("[Startup] Conectando InfluxDB...")
@@ -175,9 +179,8 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────
 #  Routers
 # ─────────────────────────────────────────────────────────────────
-from app.api.v1.router import api_v1_router  # noqa: E402 — después del app
-
-app.include_router(api_v1_router, prefix="/api/v1")
+# from app.api.v1.router import api_v1_router  # noqa: E402 — después del app
+# app.include_router(api_v1_router, prefix="/api/v1")
 
 
 # ─────────────────────────────────────────────────────────────────

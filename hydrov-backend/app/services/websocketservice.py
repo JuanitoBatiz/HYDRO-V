@@ -1,7 +1,7 @@
 # app/services/websocketservice.py
 import asyncio
 import json
-import aioredis
+import redis.asyncio as redis
 from fastapi import WebSocket, WebSocketDisconnect
 from app.core.config import settings
 from app.core.logger import logger
@@ -59,9 +59,9 @@ async def redis_listener(node_id: str) -> None:
     Se lanza como background task cuando un cliente
     WebSocket se conecta.
     """
-    redis   = aioredis.from_url(settings.REDIS_URL)
+    redis_conn = redis.from_url(settings.REDIS_URL)
     channel = settings.WS_ALERT_CHANNEL.format(node_id=node_id)
-    pubsub  = redis.pubsub()
+    pubsub  = redis_conn.pubsub()
 
     await pubsub.subscribe(channel)
     logger.info(f"[WS] Redis listener activo en canal {channel}")
@@ -75,7 +75,7 @@ async def redis_listener(node_id: str) -> None:
         pass
     finally:
         await pubsub.unsubscribe(channel)
-        await redis.aclose()
+        await redis_conn.aclose()
 
 
 async def handle_websocket(websocket: WebSocket, node_id: str) -> None:

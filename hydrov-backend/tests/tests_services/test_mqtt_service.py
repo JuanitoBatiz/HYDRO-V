@@ -207,7 +207,7 @@ class TestHandleEmergency:
         mqtt_client = AsyncMock()
         mqtt_client.publish = AsyncMock()
 
-        with patch("app.services.mqtt_service.aioredis") as redis_mock:
+        with patch("app.services.mqtt_service.redis") as redis_mock:
             redis_instance = AsyncMock()
             redis_instance.publish = AsyncMock()
             redis_instance.aclose  = AsyncMock()
@@ -230,7 +230,7 @@ class TestHandleEmergency:
         mqtt_client = AsyncMock()
         mqtt_client.publish = AsyncMock()
 
-        with patch("app.services.mqtt_service.aioredis") as redis_mock:
+        with patch("app.services.mqtt_service.redis") as redis_mock:
             redis_instance = AsyncMock()
             redis_instance.publish = AsyncMock()
             redis_instance.aclose  = AsyncMock()
@@ -253,7 +253,7 @@ class TestHandleEmergency:
         mqtt_client = AsyncMock()
         mqtt_client.publish = AsyncMock()
 
-        with patch("app.services.mqtt_service.aioredis") as redis_mock:
+        with patch("app.services.mqtt_service.redis") as redis_mock:
             redis_instance = AsyncMock()
             redis_instance.publish = AsyncMock()
             redis_instance.aclose  = AsyncMock()

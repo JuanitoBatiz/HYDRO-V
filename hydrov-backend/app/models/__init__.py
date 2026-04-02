@@ -1,12 +1,11 @@
-# app/models/__init__.py
-from app.models.telemetry import TelemetryEvent
-from app.models.alert import EmergencyAlert
-from app.models.device import Device
-from app.models.user import User
-
-__all__ = [
-    "TelemetryEvent",
-    "EmergencyAlert",
-    "Device",
-    "User",
-]
+from .zone import Zone
+from .role import Role
+from .sensor_type import SensorType
+from .valve_type import ValveType
+from .alert_type import AlertType
+from .device import Device, DeviceEdge
+from .user import User
+from .sensor import Sensor
+from .valve import Valve
+from .alert import Alert
+from .audit_log import AuditLog

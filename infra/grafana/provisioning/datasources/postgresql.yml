@@ -12,13 +12,13 @@ datasources:
     uid: hydrov-postgres
     access: proxy
     url: postgres:5432
-    database: ${POSTGRES_DB:-hydrov}
-    user: ${POSTGRES_USER:-hydrov}
+    database: hydrov
+    user: hydrov
     isDefault: false
     jsonData:
       sslmode: disable
       postgresVersion: 1500
       timescaledb: false
     secureJsonData:
-      password: ${POSTGRES_PASSWORD}
-    editable: false
+      password: hydrov1234
+    editable: true

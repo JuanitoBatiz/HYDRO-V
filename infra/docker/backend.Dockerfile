@@ -21,9 +21,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Instalar dependencias en un directorio separado para copiarlo luego
+# (⚠️ DOCKER USARÁ SU MEMORIA CACHÉ AQUÍ PARA AHORRARTE LA HORA Y MEDIA ⚠️)
 RUN pip install --upgrade pip \
     && pip install --prefix=/install --no-cache-dir -r requirements.txt
 
+# ── LA CORRECCIÓN MÁGICA: Instalar requirements extra súper rápido ──
+COPY requirements-extra.txt .
+RUN pip install --prefix=/install --no-cache-dir -r requirements-extra.txt
+# ─────────────────────────────────────────────────────────────────
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
@@ -57,7 +62,7 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
 # Arrancar con uvicorn en modo producción
 # Para desarrollo, docker-compose sobreescribe esto con --reload
 CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2", \
-     "--log-level", "info"]
+    "--host", "0.0.0.0", \
+    "--port", "8000", \
+    "--workers", "2", \
+    "--log-level", "info"]

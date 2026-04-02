@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, oauth2_scheme
 from app.db.session import AsyncSessionLocal
 from app.db.influx_client import InfluxManager
 from app.models.user import User
@@ -75,48 +75,43 @@ def get_influx_query():
 
 
 # ─────────────────────────────────────────────────────────────────
-#  Usuario autenticado (combina JWT + DB lookup)
+#  Usuario autenticado (combina JWT + Redis session lookup)
 # ─────────────────────────────────────────────────────────────────
+from app.services.redis_service import redis_service
+import json
 
 async def get_current_user(
-    user_id: int = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
-) -> User:
+    token: str = Depends(oauth2_scheme),
+) -> dict:
     """
-    Dependency que valida el JWT Y comprueba que el usuario existe
-    y está activo en PostgreSQL.
-
-    Retorna el ORM User completo. Lanza 401/403 si algo falla.
-
-    Uso:
-        async def endpoint(user: User = Depends(get_current_user)): ...
+    Dependency que valida el Bearer token directamente contra Redis (V2.0).
+    Retorna un diccionario con los datos del usuario. Lanza 401 si no existe.
     """
-    from sqlalchemy import select
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-
-    if user is None:
+    session_data = await redis_service.redis_client.get(f"session:{token}")
+    if not session_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario no encontrado",
+            detail="Sesión expirada o inválida",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo",
-        )
-    return user
+    return json.loads(session_data)
+
+
+async def get_current_token(token: str = Depends(oauth2_scheme)) -> str:
+    """
+    Dependency para obtener el string del token.
+    """
+    return token
 
 
 async def get_current_superuser(
-    user: User = Depends(get_current_user),
-) -> User:
+    user: dict = Depends(get_current_user),
+) -> dict:
     """
-    Como get_current_user pero además exige is_superuser=True.
+    Como get_current_user pero además exige role_id == 1 (admin).
     Usar en endpoints de administración.
     """
-    if not user.is_superuser:
+    if user.get("role_id") != 1:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requieren permisos de administrador",

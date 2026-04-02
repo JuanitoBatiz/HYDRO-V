@@ -33,11 +33,7 @@ from app.core.config import settings
 from app.db.base import Base  # noqa: F401
 
 # IMPORTANTE: si añades un modelo nuevo, impórtalo aquí también
-from app.models.user import User                          # noqa: F401
-from app.models.device import Device                      # noqa: F401
-from app.models.telemetry import TelemetryEvent           # noqa: F401
-from app.models.alert import EmergencyAlert               # noqa: F401
-from app.models.prediction import AutonomyPrediction, LeakDetection  # noqa: F401
+from app import models
 
 # ── Alembic Config ────────────────────────────────────────────────
 config = context.config

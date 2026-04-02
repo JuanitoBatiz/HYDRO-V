@@ -1,53 +1,67 @@
 # app/services/mqtt_service.py
 import asyncio
 import json
+import uuid
 import asyncpg
-import aioredis
 import aiomqtt
-from datetime import datetime, timezone
-from influxdb_client import Point
+from datetime import datetime
 from app.core.config import settings
 from app.core.logger import logger
-from app.schemas.telemetry import ESP32PayloadSchema
-from app.schemas.alert import EmergencyAlertCreateSchema
-from app.services.influx_service import InfluxService
+from app.schemas.mqtt import ESP32PayloadSchema
+from app.services.influx_service import influx_service
+from app.services.redis_service import redis_service
+from app.services.device_cache import DeviceCache
 
 
 async def handle_emergency(
     payload:   ESP32PayloadSchema,
     pg_pool:   asyncpg.Pool,
+    device_cache: DeviceCache,
     mqtt_client: aiomqtt.Client,
 ) -> None:
     """
     Cascada de 3 acciones ante estado EMERGENCY:
-    1. PostgreSQL  → registro permanente de auditoría
+    1. PostgreSQL  → registro permanente en tabla 'alerts' (nueva arquitectura v2)
     2. MQTT        → ACK de vuelta al ESP32
     3. Redis       → notificación al frontend via WebSocket
     """
-    node_id   = payload.device_id
-    timestamp = payload.received_at
+    device_code = payload.device_code
+    timestamp   = payload.received_at
 
-    # 1. PostgreSQL ───────────────────────────────────────────────
-    try:
-        await pg_pool.execute(
-            """
-            INSERT INTO emergency_alerts
-                (node_id, timestamp, error_count, state_duration_ms, payload_snapshot)
-            VALUES ($1, $2, $3, $4, $5::jsonb)
-            """,
-            node_id,
-            timestamp,
-            payload.system_state.error_count,
-            payload.system_state.state_duration_ms,
-            payload.model_dump_json(),
-        )
-        logger.info(f"[MQTT] Emergency guardada en PostgreSQL | node={node_id}")
-    except Exception as e:
-        logger.error(f"[MQTT] Error guardando emergency en PostgreSQL: {e}")
+    # Para meter una alerta en PostgreSQL V2 necesitamos el device_id numérico PK
+    meta = await device_cache.get_device_metadata(device_code)
+    db_device_id = meta["id"] if meta else None
+
+    if not db_device_id:
+        logger.error(f"[MQTT] No se encontró el device_id para {device_code}. Imposible crear alerta en PG.")
+    else:
+        # 1. PostgreSQL (Tabla alerts) ───────────────────────────────────────────────
+        try:
+            # Obtenemos el alert_type_id de la emergencia (name='emergency' en el Seed)
+            async with pg_pool.acquire() as conn:
+                alert_type_id = await conn.fetchval("SELECT id FROM alert_types WHERE name = 'emergency'")
+                
+                if alert_type_id:
+                    await conn.execute(
+                        """
+                        INSERT INTO alerts
+                            (device_id, alert_type_id, severity, confidence_score, description, payload_snapshot, detected_at)
+                        VALUES ($1, $2, 'critical', 1.0, 'Estado EMERGENCY detectado en FSM del ESP32', $3::jsonb, $4)
+                        """,
+                        db_device_id,
+                        alert_type_id,
+                        payload.model_dump_json(),
+                        timestamp
+                    )
+                    logger.info(f"[MQTT] Emergency guardada en PostgreSQL | device={device_code}")
+                else:
+                    logger.error(f"[MQTT] Missing 'emergency' AlertType in DB catalog.")
+        except Exception as e:
+            logger.error(f"[MQTT] Error guardando emergency en PostgreSQL: {e}")
 
     # 2. MQTT ACK al ESP32 ────────────────────────────────────────
     try:
-        ack_topic   = settings.MQTT_TOPIC_COMMANDS.format(node_id=node_id)
+        ack_topic   = settings.MQTT_TOPIC_COMMANDS.format(node_id=device_code) # Usa el mismo topic que V1
         ack_payload = json.dumps({
             "action":    "EMERGENCY_ACK",
             "timestamp": timestamp.isoformat(),
@@ -60,97 +74,77 @@ async def handle_emergency(
 
     # 3. Redis → WebSocket frontend ───────────────────────────────
     try:
-        redis = aioredis.from_url(settings.REDIS_URL)
-        channel = settings.WS_ALERT_CHANNEL.format(node_id=node_id)
-        await redis.publish(
-            channel,
-            json.dumps({
-                "type":        "EMERGENCY",
-                "node_id":     node_id,
-                "timestamp":   timestamp.isoformat(),
-                "error_count": payload.system_state.error_count,
-            })
+        await redis_service.publish_emergency(
+            device_code=device_code,
+            error_count=payload.system_state.error_count,
+            timestamp_iso=timestamp.isoformat()
         )
-        await redis.aclose()
-        logger.info(f"[MQTT] Emergency publicada en Redis canal {channel}")
     except Exception as e:
-        logger.error(f"[MQTT] Error publicando en Redis: {e}")
+        logger.error(f"[MQTT] Error publicando en Redis via WS: {e}")
 
 
 async def process_message(
     message:     aiomqtt.Message,
-    influx_svc:  InfluxService,
     pg_pool:     asyncpg.Pool,
+    device_cache: DeviceCache,
     mqtt_client: aiomqtt.Client,
 ) -> None:
     """
-    Procesa cada mensaje MQTT del ESP32:
-    1. Valida con Pydantic
-    2. Escribe en InfluxDB
-    3. Si es EMERGENCY → cascada de alertas
+    Procesa cada mensaje MQTT del ESP32 de acuerdo a Pipeline V2.
     """
     try:
         raw     = json.loads(message.payload.decode())
         payload = ESP32PayloadSchema(**raw)
-        node_id = payload.device_id
-        now     = payload.received_at  # timestamp del backend, no del ESP32
+        
+        device_code = payload.device_code
 
-        # ── Construir Point de InfluxDB ───────────────────────────
-        point = (
-            Point("sensor_telemetry")
-            .tag("node_id",   node_id)
-            .tag("fsm_state", payload.system_state.state)
-            # Sensores
-            .field("turbidity_ntu",      payload.sensors.turbidity_ntu)
-            .field("distance_cm",        payload.sensors.distance_cm)
-            .field("flow_lpm",           payload.sensors.flow_lpm)
-            .field("flow_total_liters",  payload.sensors.flow_total_liters)
-            # Estado FSM
-            .field("state_duration_ms",  payload.system_state.state_duration_ms)
-            .field("intake_cycles",      payload.system_state.intake_cycles)
-            .field("reject_cycles",      payload.system_state.reject_cycles)
-            .field("error_count",        payload.system_state.error_count)
-            # Uptime del ESP32 (millis())
-            .field("esp32_uptime_ms",    payload.timestamp)
-            .time(now)
-        )
+        # ── 1. Update Latest State Cache in Redis ───────────────
+        await redis_service.update_device_state(payload)
 
-        await influx_svc.write_telemetry(point)
-        logger.debug(f"[MQTT] Telemetría guardada | node={node_id} state={payload.system_state.state}")
+        # ── 2. Escribe en InfluxDB (measurements separadas) ──────
+        await influx_service.write_telemetry(payload)
+        
+        # Opcional log debug
+        # logger.debug(f"[MQTT] Telemetría procesada | device={device_code} state={payload.system_state.state}")
 
-        # ── Handler de emergencia ─────────────────────────────────
+        # ── 3. Handler de emergencia ─────────────────────────────
         if payload.system_state.state == "EMERGENCY":
-            await handle_emergency(payload, pg_pool, mqtt_client)
+            await handle_emergency(payload, pg_pool, device_cache, mqtt_client)
+
+        # ── 4. Actualizar last_seen_at en PG (Opcional pero útil) ──
+        # Lo haremos en backend job o de manera menos intensiva que un update per-packet.
 
     except Exception as e:
         logger.error(f"[MQTT] Error procesando mensaje: {e}")
-        logger.debug(f"[MQTT] Payload raw: {message.payload}")
+        logger.debug(f"[MQTT] Payload raw devuelto error: {message.payload}")
 
 
 async def mqtt_to_influx_loop(pg_pool: asyncpg.Pool) -> None:
     """
-    Loop permanente que escucha MQTT y escribe en InfluxDB.
-    Se lanza como background task en el lifespan de main.py.
-    Reconecta automáticamente si pierde conexión.
+    Loop permanente que escucha MQTT y procesa la telemetría.
     """
-    influx_svc = InfluxService()
+    device_cache = DeviceCache(pg_pool)
 
     while True:
         try:
+            base_id = settings.MQTT_CLIENT_ID or "hydrov_backend"
+            unique_client_id = f"{base_id}_{uuid.uuid4().hex[:8]}"
+
             async with aiomqtt.Client(
                 hostname=settings.MQTT_HOST,
                 port=settings.MQTT_PORT,
                 username=settings.MQTT_USER,
                 password=settings.MQTT_PASSWORD,
                 tls_params=aiomqtt.TLSParameters(),
-                client_id=settings.MQTT_CLIENT_ID,
+                client_id=unique_client_id,
             ) as client:
                 await client.subscribe(settings.MQTT_TOPIC_TELEMETRY, qos=1)
-                logger.info(f"[MQTT] Conectado y suscrito a {settings.MQTT_TOPIC_TELEMETRY}")
+                logger.info(f"[MQTT] Conectado y suscrito a {settings.MQTT_TOPIC_TELEMETRY} con ID {unique_client_id}")
 
-                async for message in client.messages:
-                    await process_message(message, influx_svc, pg_pool, client)
+                async with client.messages() as messages:
+                    async for message in messages:
+                        await process_message(message, pg_pool, device_cache, client)
 
         except Exception as e:
-            logger.warning(f"[MQTT] Conexión perdida: {e}. Reintentando en 5s...")
+            logger.warning(f"[MQTT] Conexión pérdida: {e}. Reintentando en 5s...")
             await asyncio.sleep(5)

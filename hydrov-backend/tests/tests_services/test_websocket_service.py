@@ -206,7 +206,7 @@ class TestHandleWebSocket:
         mock_redis.pubsub.return_value = mock_pubsub
 
         with patch(
-            "app.services.websocketservice.aioredis.from_url",
+            "app.services.websocketservice.redis.from_url",
             return_value=mock_redis,
         ):
             await handle_websocket(ws, "HYDRO-V-001")
@@ -228,7 +228,7 @@ class TestHandleWebSocket:
         mock_redis.pubsub.return_value = mock_pubsub
 
         with patch(
-            "app.services.websocketservice.aioredis.from_url",
+            "app.services.websocketservice.redis.from_url",
             return_value=mock_redis,
         ):
             await handle_websocket(ws, "HYDRO-V-001")
@@ -257,7 +257,7 @@ class TestHandleWebSocket:
         mock_redis.pubsub.return_value = mock_pubsub
 
         with patch(
-            "app.services.websocketservice.aioredis.from_url",
+            "app.services.websocketservice.redis.from_url",
             return_value=mock_redis,
         ):
             # No debe lanzar WebSocketDisconnect hacia afuera
@@ -277,7 +277,7 @@ class TestHandleWebSocket:
         ws = make_websocket()
 
         with patch(
-            "app.services.websocketservice.aioredis.from_url",
+            "app.services.websocketservice.redis.from_url",
             side_effect=ConnectionError("Redis no disponible"),
         ):
             try:
@@ -306,7 +306,7 @@ class TestHandleWebSocket:
         mock_redis.pubsub.return_value = mock_pubsub
 
         with patch(
-            "app.services.websocketservice.aioredis.from_url",
+            "app.services.websocketservice.redis.from_url",
             return_value=mock_redis,
         ):
             await handle_websocket(ws, "HYDRO-V-001")

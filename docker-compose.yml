@@ -1,13 +1,3 @@
-# ─────────────────────────────────────────────────────────────────
-#  HYDRO-V — Docker Compose (Desarrollo local)
-#  Levanta todo el stack excepto MQTT (HiveMQ Cloud es externo)
-#
-#  Uso:
-#    docker compose up -d            # arrancar en background
-#    docker compose logs -f backend  # ver logs del backend
-#    docker compose down -v          # apagar y borrar volúmenes
-# ─────────────────────────────────────────────────────────────────
-
 services:
 
   # ── PostgreSQL 15 ───────────────────────────────────────────────
@@ -39,19 +29,19 @@ services:
     restart: unless-stopped
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_ADMIN_USER:-admin}
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_ADMIN_PASSWORD:-admin1234}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-hydrov}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET_TELEMETRY:-sensor_telemetry}
+      DOCKER_INFLUXDB_INIT_ORG: hydrov
+      DOCKER_INFLUXDB_INIT_BUCKET: sensor_telemetry
+      DOCKER_INFLUXDB_INIT_RETENTION: 720h
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
-      - influxdb_config:/etc/influxdb2
       - ./infra/db/init_influxdb.sh:/docker-entrypoint-initdb.d/init_influxdb.sh:ro
     ports:
       - "8086:8086"
     healthcheck:
-      test: [ "CMD", "influx", "ping" ]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8086/ping || exit 1" ]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -64,7 +54,7 @@ services:
     container_name: hydrov-redis
     restart: unless-stopped
     command: >
-      redis-server --requirepass ${REDIS_PASSWORD:-} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+      redis-server --requirepass "${REDIS_PASSWORD:-}" --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
@@ -85,15 +75,15 @@ services:
     container_name: hydrov-backend
     restart: unless-stopped
     env_file:
-      - ./hydrov-backend/.env
+      - .env # <--- ¡CORRECCIÓN MÁGICA AQUÍ! AHORA LEE LA RAÍZ
     environment:
-      # Sobreescribir hosts para que apunten a los contenedores
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       INFLUX_URL: http://influxdb:8086
+      PYTHONPATH: "/app:/hydrov-ml"
     volumes:
-      - ./hydrov-backend:/app # hot-reload en desarrollo
-      - ./hydrov-ml:/hydrov-ml:ro # modelos ML accesibles
+      - ./hydrov-backend:/app
+      - ./hydrov-ml:/hydrov-ml:ro
     ports:
       - "8000:8000"
     depends_on:
@@ -144,7 +134,7 @@ services:
     networks:
       - hydrov-net
 
-  # ── Grafana — Control Center NASA Style ───────────────────────────
+  # ── Grafana ─────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.0
     container_name: hydrov-grafana
@@ -156,11 +146,9 @@ services:
       GF_DEFAULT_THEME: dark
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      # InfluxDB datasource
       INFLUX_URL: http://influxdb:8086
       INFLUX_TOKEN: ${INFLUX_TOKEN}
       INFLUX_ORG: ${INFLUX_ORG:-hydrov}
-      # PostgreSQL datasource (mapa de nodos, alertas, predicciones ML)
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-hydrov}
@@ -183,20 +171,14 @@ services:
     networks:
       - hydrov-net
 
-# ── Volúmenes persistentes ────────────────────────────────────────
 volumes:
   postgres_data:
-    driver: local
   influxdb_data:
-    driver: local
   influxdb_config:
-    driver: local
   redis_data:
-    driver: local
   grafana_data:
-    driver: local
 
-# ── Red interna ───────────────────────────────────────────────────
+
 networks:
   hydrov-net:
     driver: bridge

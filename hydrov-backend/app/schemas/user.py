@@ -7,7 +7,9 @@ from typing import Optional
 class UserCreateSchema(BaseModel):
     email:    EmailStr
     password: str = Field(min_length=8)
-    name:     str = Field(max_length=100)
+    full_name: str = Field(max_length=150)
+    role_id: int = Field(default=3) # Viewer by default
+    zone_id: Optional[int] = None
 
 
 class UserLoginSchema(BaseModel):
@@ -18,9 +20,12 @@ class UserLoginSchema(BaseModel):
 class UserResponseSchema(BaseModel):
     id:         int
     email:      str
-    name:       str
+    full_name:  str
+    role_id:    int
+    zone_id:    Optional[int]
     is_active:  bool
     created_at: datetime
+    last_login_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
 
@@ -28,6 +33,7 @@ class UserResponseSchema(BaseModel):
 class TokenSchema(BaseModel):
     access_token: str
     token_type:   str = "bearer"
+    expires_in:   int = 86400
 
 
 class TokenPayloadSchema(BaseModel):

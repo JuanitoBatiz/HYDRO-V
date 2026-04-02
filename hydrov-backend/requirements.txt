@@ -20,7 +20,7 @@ alembic>=1.13.0
 influxdb-client[async]>=1.40.0
 
 # ── Redis ─────────────────────────────────────────────────────────
-aioredis>=2.0.0
+redis>=4.5.0
 
 # ── MQTT ──────────────────────────────────────────────────────────
 aiomqtt>=1.2.0
@@ -35,3 +35,4 @@ apscheduler>=3.10.0
 numpy>=1.26.0
 scikit-learn>=1.4.0        # predict_autonomy (linear regression)
 torch>=2.2.0               # detect_leaks (GNN)
+torch-geometric

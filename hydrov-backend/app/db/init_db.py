@@ -5,10 +5,7 @@ from app.db.session import engine
 
 # Importar todos los modelos aquí para que Base los registre
 # Cada vez que agregues un modelo nuevo, impórtalo aquí también
-from app.models.alert import EmergencyAlert      # noqa: F401
-from app.models.device import Device             # noqa: F401
-from app.models.telemetry import TelemetryEvent  # noqa: F401
-from app.models.user import User                 # noqa: F401
+from app import models
 
 
 async def init_db() -> None:
