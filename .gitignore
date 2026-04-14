@@ -1,1 +1,9 @@
 node_modules/
+
+# Ambientes y configuraciones de variables (Secretos)
+.env
+.env.local
+.env.*
+
+# Configuraciones sensibles de WiFi/MQTT de ESP32 Firmware
+edge/include/config.h
