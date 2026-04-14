@@ -7,6 +7,8 @@
 #include "fsm_logic.h"
 #include "storage_fs.h"
 
+extern float current_dtdt;
+
 void publishTelemetryData(SensorData_t currentSensors) {
 	StaticJsonDocument<512> doc;
 
@@ -18,6 +20,7 @@ void publishTelemetryData(SensorData_t currentSensors) {
 	sensors["distance_cm"] = serialized(String(currentSensors.distance_cm, 1));
 	sensors["flow_lpm"] = serialized(String(currentSensors.flow_lpm, 2));
 	sensors["flow_total_liters"] = serialized(String(currentSensors.flow_total, 2));
+	sensors["dtdt"] = serialized(String(current_dtdt, 2));
 
 	FSMContext_t fsmState = getFSMContext();
 	JsonObject systemState = doc.createNestedObject("system_state");

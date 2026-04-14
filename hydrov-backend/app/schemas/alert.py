@@ -1,37 +1,25 @@
-# app/schemas/alert.py
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-
-class EmergencyAlertCreateSchema(BaseModel):
-    """Schema interno — lo usa mqtt_service al detectar EMERGENCY."""
-    node_id:          str
-    timestamp:        datetime
-    error_count:      int
-    state_duration_ms: int
-    payload_snapshot: dict     # JSON completo del ESP32 en el momento del fallo
-
-
-class EmergencyAlertResponseSchema(BaseModel):
-    """Schema de respuesta para el endpoint GET /alerts."""
-    id:               int
-    node_id:          str
-    timestamp:        datetime
-    error_count:      int
-    state_duration_ms: int
-    resolved:         bool
-    created_at:       datetime
+class AlertResponseSchema(BaseModel):
+    id: int
+    device_id: int
+    sensor_id: Optional[int]
+    alert_type_id: int
+    severity: str
+    confidence_score: Optional[float]
+    description: Optional[str]
+    payload_snapshot: dict
+    detected_at: datetime
+    resolved_at: Optional[datetime]
+    is_resolved: bool
 
     model_config = {"from_attributes": True}
 
-
 class AlertListSchema(BaseModel):
-    total:  int
-    items:  list[EmergencyAlertResponseSchema]
-
+    total: int
+    items: list[AlertResponseSchema]
 
 class AlertResolveSchema(BaseModel):
-    """Para marcar una alerta como resuelta desde el frontend."""
-    resolved: bool = True
-    notes:    Optional[str] = Field(None, max_length=500)
+    is_resolved: bool = True

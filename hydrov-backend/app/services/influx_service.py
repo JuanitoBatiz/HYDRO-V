@@ -15,10 +15,17 @@ class InfluxService:
 
     # ── Escritura ─────────────────────────────────────────────────
 
-    async def write_telemetry(self, payload: ESP32PayloadSchema) -> None:
-        """Escribe telemetría del ESP32 desnormalizada en dos measurements."""
+    async def write_telemetry(self, payload: ESP32PayloadSchema, zone_code: str | None = None) -> None:
+        """Escribe telemetría del ESP32 desnormalizada en dos measurements.
+
+        Args:
+            payload: Datos validados del ESP32.
+            zone_code: Código de zona del dispositivo (I-02). Si se provee,
+                       se adjunta como tag en InfluxDB para permitir queries
+                       agregadas por zona sin JOIN a PostgreSQL.
+        """
         write_api = InfluxManager.get_write_api()
-        
+
         device_code = payload.device_code
         now = payload.received_at
 
@@ -44,6 +51,11 @@ class InfluxService:
             .field("error_count", payload.system_state.error_count)
             .time(now)
         )
+
+        # I-02: inyectar zone_code como tag si está disponible
+        if zone_code:
+            p_sensor = p_sensor.tag("zone_code", zone_code)
+            p_state  = p_state.tag("zone_code", zone_code)
 
         await write_api.write(
             bucket=settings.INFLUX_BUCKET_TELEMETRY,
@@ -120,7 +132,56 @@ class InfluxService:
         return 0
 
     async def get_neighbor_nodes_data(self, device_code: str) -> list[dict]:
-        return []
+        from sqlalchemy import text
+        from app.db.session import AsyncSessionLocal
+        from app.services.redis_service import redis_service
+
+        query = text("""
+            SELECT 
+                CASE 
+                    WHEN d1.device_code = :dc THEN d2.device_code
+                    ELSE d1.device_code
+                END AS neighbor_code
+            FROM device_edges edge
+            JOIN devices d1 ON edge.source_device_id = d1.id
+            JOIN devices d2 ON edge.target_device_id = d2.id
+            WHERE d1.device_code = :dc OR d2.device_code = :dc
+        """)
+        
+        neighbors_data = []
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(query, {"dc": device_code})
+                neighbor_codes = [row.neighbor_code for row in result]
+        except Exception as e:
+            logger.error(f"[GNN] Error obteniendo vecinos de PostgreSQL para {device_code}: {e}")
+            return []
+
+        for n_code in neighbor_codes:
+            try:
+                state_dict = await redis_service.get_latest_state(n_code)
+                if state_dict and "sensors" in state_dict:
+                    neighbors_data.append({
+                        "device_code": n_code,
+                        "flow_lpm": float(state_dict["sensors"].get("flow_lpm", 0.0)),
+                        "tank_level_pct": float(state_dict.get("tank_level_pct", 0.0))
+                    })
+                else:
+                    # Vecino offline 
+                    neighbors_data.append({
+                        "device_code": n_code,
+                        "flow_lpm": 0.0,
+                        "tank_level_pct": 0.0
+                    })
+            except Exception as e:
+                logger.error(f"[GNN] Error parseando Redis para vecino {n_code}: {e}")
+                neighbors_data.append({
+                    "device_code": n_code,
+                    "flow_lpm": 0.0,
+                    "tank_level_pct": 0.0
+                })
+        
+        return neighbors_data
 
     async def get_latest_telemetry(self, device_code: str) -> dict | None:
         """Retorna la última lectura de telemetría de un dispositivo."""
@@ -149,6 +210,30 @@ class InfluxService:
             logger.error(f"[Influx] Error leyendo última telemetría de {device_code}: {e}")
 
         return None
+
+    async def get_history(self, device_code: str, hours: int = 1) -> list[dict]:
+        """Retorna histórico de telemetría de un nodo desde InfluxDB."""
+        query_api = InfluxManager.get_query_api()
+        query = f"""
+            from(bucket: "{settings.INFLUX_BUCKET_TELEMETRY}")
+              |> range(start: -{hours}h)
+              |> filter(fn: (r) => r._measurement == "sensor_reading" or r._measurement == "device_state")
+              |> filter(fn: (r) => r.device_code == "{device_code}")
+              |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+              |> sort(columns: ["_time"], desc: true)
+        """
+        try:
+            tables = await query_api.query(query)
+            results = []
+            for table in tables:
+                for record in table.records:
+                    point = record.values.copy()
+                    point["_time"] = point["_time"].isoformat()
+                    results.append(point)
+            return results
+        except Exception as e:
+            logger.error(f"[Influx] Error leyendo history de {device_code}: {e}")
+            return []
 
 
 influx_service = InfluxService()

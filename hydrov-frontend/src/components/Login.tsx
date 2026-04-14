@@ -9,6 +9,7 @@ interface LoginProps {
 export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [deviceCode, setDeviceCode] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,32 +19,42 @@ export function Login({ onLogin }: LoginProps) {
     setDeviceCode(raw);
   }
 
-  // ── Accepted device codes (add more as you roll out hardware) ────────────────
-  const VALID_DEVICE_CODES = ['HYDRO-V-NEZA-001'];
-
+  // Static codes removed for backend validation
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    // Validate email format
-    if (!email.includes('@') || !email.includes('.')) {
-      setError('Por favor escribe un correo electrónico válido.');
+    // Validate input fields are not empty
+    if (!email.includes('@') || !email.includes('.') || !password) {
+      setError('Por favor proporcione credenciales válidas y contraseña.');
       return;
     }
 
-    // Validate device code is registered
-    if (!VALID_DEVICE_CODES.includes(deviceCode.trim().toUpperCase())) {
-      setError(
-        'Código de dispositivo no reconocido. Verifica que sea exactamente como aparece en tu kit (ej. HYDRO-V-NEZA-001).'
-      );
+    if (!deviceCode.trim()) {
+      setError('Se requiere código de dispositivo para inicializar telemetría.');
       return;
     }
 
     setLoading(true);
-    // Simulate network pairing handshake (replace with real API call)
-    await new Promise((r) => setTimeout(r, 1600));
-    setLoading(false);
-    onLogin(email, deviceCode.trim().toUpperCase());
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (response.ok) {
+        const { access_token } = await response.json();
+        localStorage.setItem('hydrov_token', access_token);
+        onLogin(email, deviceCode.trim().toUpperCase());
+      } else {
+        setError('Credenciales incorrectas o usuario no encontrado');
+      }
+    } catch (err) {
+      setError('Problema de red. El backend podría estar caído.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -124,9 +135,26 @@ export function Login({ onLogin }: LoginProps) {
                     aria-describedby="email-hint"
                   />
                 </div>
-                <p id="email-hint" className="text-sm text-neutral-500">
-                  El correo que usaste para registrar tu cuenta.
-                </p>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <label htmlFor="login-password" className="block text-base font-semibold text-neutral-800">
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
+                  <input
+                    id="login-password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    placeholder="*************"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-12"
+                  />
+                </div>
               </div>
 
               {/* Device code */}

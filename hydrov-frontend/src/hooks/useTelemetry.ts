@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import mqtt from 'mqtt';
 import type { TelemetryPayload, TelemetryHistory, HistoricalDataPoint } from '@/types/telemetry.types';
 
-const BROKER_URL = 'wss://56e39f9776c14953958f63d9c18ae8ef.s1.eu.hivemq.cloud:8884/mqtt';
-const TOPIC = 'hydrov/neza/001/telemetry';
+const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL || 'wss://localhost:8884/mqtt';
+const MQTT_USER  = import.meta.env.VITE_MQTT_USER || '';
+const MQTT_PASS  = import.meta.env.VITE_MQTT_PASS || '';
+const TOPIC = import.meta.env.VITE_MQTT_TOPIC || 'hydrov/+/+/telemetry';
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -36,8 +38,8 @@ export function useHydroData(): UseHydroDataReturn {
     
     // 1. Client ID Dinámico (Moviendo options dentro del useEffect para que sea fresh)
     const options: mqtt.IClientOptions = {
-      username: 'hydrov_esp32_01',
-      password: 'Emmamiamor1',
+      username: MQTT_USER,
+      password: MQTT_PASS,
       clientId: 'hydrov-web-' + Math.random().toString(16).substring(2, 8),
       protocol: 'wss',
       reconnectPeriod: 5000,

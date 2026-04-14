@@ -14,7 +14,7 @@ class RedisService:
     def __init__(self):
         self.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
-    async def update_device_state(self, payload: ESP32PayloadSchema) -> None:
+    async def update_device_state(self, payload: ESP32PayloadSchema, tank_level_pct: float | None = None) -> None:
         """
         Almacena el último estado del dispositivo bajo la nomenclatura V2:
         device:state:{device_code}
@@ -22,9 +22,11 @@ class RedisService:
         """
         key = f"device:state:{payload.device_code}"
         try:
-            # Serializamos la fecha explícitamente porque model_dump_json ya lo hace pero para evitar rollos
-            data = payload.model_dump_json()
-            await self.redis_client.setex(key, 300, data)
+            data_dict = payload.model_dump(mode="json")
+            if tank_level_pct is not None:
+                data_dict["tank_level_pct"] = tank_level_pct
+                
+            await self.redis_client.setex(key, 300, json.dumps(data_dict))
         except Exception as e:
             logger.error(f"[Redis] Error actualizando estado de {payload.device_code}: {e}")
 

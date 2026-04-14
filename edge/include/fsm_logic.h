@@ -23,6 +23,10 @@ struct FSMContext_t {
 void initFSM();
 void updateSystemState(float turbidity, float distanceCm);
 FSMContext_t getFSMContext();
+void resetFsmErrors();
+
+extern bool forceHarvestMode;
+extern bool forceIdleMode;
 
 // Dos versiones para evitar que el main se confunda
 const char* getStateNameString(SystemState state);

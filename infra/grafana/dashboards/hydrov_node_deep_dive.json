@@ -1,7 +1,7 @@
 {
-  "title": "🔬 HYDRO-V — Node Deep Dive",
+  "title": "\ud83d\udd2c HYDRO-V \u2014 Node Deep Dive",
   "uid": "hydrov-node-deep-dive",
-  "description": "Análisis profundo de un nodo individual. Timeline FSM, estadísticas de sesión y eficiencia de captación.",
+  "description": "An\u00e1lisis profundo de un nodo individual. Timeline FSM, estad\u00edsticas de sesi\u00f3n y eficiencia de captaci\u00f3n.",
   "tags": [
     "hydrov",
     "node",
@@ -9,7 +9,7 @@
   ],
   "timezone": "America/Mexico_City",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": {
     "from": "now-6h",
@@ -17,7 +17,7 @@
   },
   "links": [
     {
-      "title": "← Mission Control",
+      "title": "\u2190 Mission Control",
       "url": "/d/hydrov-mission-control",
       "type": "link",
       "icon": "arrow-left"
@@ -47,8 +47,8 @@
   "panels": [
     {
       "id": 1,
-      "title": "⏱️ Timeline de Estados FSM",
-      "description": "Evolución temporal del estado del sistema. Muestra cuándo y cuánto tiempo estuvo en cada estado.",
+      "title": "\u23f1\ufe0f Timeline de Estados FSM",
+      "description": "Evoluci\u00f3n temporal del estado del sistema. Muestra cu\u00e1ndo y cu\u00e1nto tiempo estuvo en cada estado.",
       "type": "state-timeline",
       "gridPos": {
         "h": 6,
@@ -63,7 +63,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state\")\n  |> aggregateWindow(every: 5s, fn: last)\n  |> fill(usePrevious: true)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"device_state\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"fsm_state\")\n  |> aggregateWindow(every: 5s, fn: last)\n  |> fill(usePrevious: true)",
           "legendFormat": "Estado FSM"
         }
       ],
@@ -128,8 +128,8 @@
     },
     {
       "id": 2,
-      "title": "📋 Estadísticas de la Sesión",
-      "description": "Métricas calculadas para el rango de tiempo seleccionado.",
+      "title": "\ud83d\udccb Estad\u00edsticas de la Sesi\u00f3n",
+      "description": "M\u00e9tricas calculadas para el rango de tiempo seleccionado.",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -144,7 +144,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\" or r._field == \"flow_lpm\" or r._field == \"flow_total_liters\" or r._field == \"intake_cycles\" or r._field == \"reject_cycles\")\n  |> group(columns: [\"_field\"])\n  |> reduce(\n      fn: (r, accumulator) => ({\n          min:   (r._value < accumulator.min) ? r._value : accumulator.min,\n          max:   (r._value > accumulator.max) ? r._value : accumulator.max,\n          sum:   accumulator.sum + r._value,\n          count: accumulator.count + 1.0\n      }),\n      identity: {min: 9999.0, max: -9999.0, sum: 0.0, count: 0.0}\n  )\n  |> map(fn: (r) => ({r with mean: r.sum / r.count}))",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\" or r._field == \"flow_lpm\" or r._field == \"flow_total_liters\" or r._field == \"intake_cycles\" or r._field == \"reject_cycles\")\n  |> group(columns: [\"_field\"])\n  |> reduce(\n      fn: (r, accumulator) => ({\n          min:   (r._value < accumulator.min) ? r._value : accumulator.min,\n          max:   (r._value > accumulator.max) ? r._value : accumulator.max,\n          sum:   accumulator.sum + r._value,\n          count: accumulator.count + 1.0\n      }),\n      identity: {min: 9999.0, max: -9999.0, sum: 0.0, count: 0.0}\n  )\n  |> map(fn: (r) => ({r with mean: r.sum / r.count}))",
           "legendFormat": ""
         }
       ],
@@ -162,8 +162,8 @@
     },
     {
       "id": 3,
-      "title": "✅ Eficiencia de Captación",
-      "description": "Porcentaje de ciclos exitosos vs rechazados. > 90% = óptimo para condiciones de lluvia urbana.",
+      "title": "\u2705 Eficiencia de Captaci\u00f3n",
+      "description": "Porcentaje de ciclos exitosos vs rechazados. > 90% = \u00f3ptimo para condiciones de lluvia urbana.",
       "type": "gauge",
       "gridPos": {
         "h": 8,
@@ -178,7 +178,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "intake = from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()\n\nreject = from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()\n\njoin(\n  tables: {intake: intake, reject: reject},\n  on: [\"_time\", \"node_id\"]\n)\n  |> map(fn: (r) => ({\n      r with\n      _value: if (r._value_intake + r._value_reject) > 0.0\n              then r._value_intake / (r._value_intake + r._value_reject) * 100.0\n              else 0.0\n  }))",
+          "query": "intake = from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()\n\nreject = from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()\n\njoin(\n  tables: {intake: intake, reject: reject},\n  on: [\"_time\", \"node_id\"]\n)\n  |> map(fn: (r) => ({\n      r with\n      _value: if (r._value_intake + r._value_reject) > 0.0\n              then r._value_intake / (r._value_intake + r._value_reject) * 100.0\n              else 0.0\n  }))",
           "legendFormat": "Eficiencia %"
         }
       ],
@@ -227,7 +227,7 @@
     },
     {
       "id": 4,
-      "title": "🌡️ Comparativa Turbidez vs Flujo",
+      "title": "\ud83c\udf21\ufe0f Comparativa Turbidez vs Flujo",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -242,12 +242,12 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
           "legendFormat": "Turbidez (NTU)"
         },
         {
           "refId": "B",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
           "legendFormat": "Flujo (L/min)"
         }
       ],
@@ -309,6 +309,109 @@
                 "id": "unit",
                 "value": "Lpm"
               }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "📉 Análisis de Decisión Adaptativa (dT/dt vs Válvula)",
+      "description": "Superposición de la derivada de turbidez y la transición de la FSM. La línea roja discontinua en -8.0 NTU/s marca el umbral DTDT_REJECT_THRESHOLD: cuando la derivada cae por debajo de ese nivel el algoritmo adaptativo abre la válvula de admisión (primer arrastre).",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "hydrov-influx-telemetry"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "dT/dt (NTU/s)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_code == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"dtdt\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"dT/dt\")"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "Válvula (1=Abierta, 0=Cerrada)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"device_state\")\n  |> filter(fn: (r) => r.device_code == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"fsm_state\")\n  |> map(fn: (r) => ({ r with _value: if r._value == \"INTAKE\" then 1.0 else 0.0 }))\n  |> yield(name: \"Válvula (1=Abierta, 0=Cerrada)\")"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red",         "value": -8.0 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "dT/dt (NTU/s)" },
+            "properties": [
+              {
+                "id": "color",
+                "value": { "fixedColor": "#2196F3", "mode": "fixed" }
+              },
+              { "id": "custom.axisPlacement", "value": "left" },
+              { "id": "custom.lineInterpolation", "value": "smooth" },
+              { "id": "custom.fillOpacity",       "value": 20 },
+              { "id": "unit",                     "value": "short" },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": { "mode": "dashed" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "transparent", "value": null },
+                    { "color": "red",         "value": -8.0 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Válvula (1=Abierta, 0=Cerrada)" },
+            "properties": [
+              {
+                "id": "color",
+                "value": { "fixedColor": "#4CAF50", "mode": "fixed" }
+              },
+              { "id": "custom.axisPlacement",     "value": "right" },
+              { "id": "custom.lineInterpolation", "value": "stepAfter" },
+              { "id": "custom.fillOpacity",       "value": 10 },
+              { "id": "min",                      "value": 0 },
+              { "id": "max",                      "value": 1.2 },
+              { "id": "unit",                     "value": "short" },
+              { "id": "custom.axisLabel",         "value": "Válvula" }
             ]
           }
         ]

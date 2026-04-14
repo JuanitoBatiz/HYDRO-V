@@ -3,33 +3,35 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-
 class DeviceCreateSchema(BaseModel):
-    device_id:   str = Field(pattern=r"^HYDRO-V-\d{3}$")  # HYDRO-V-001, HYDRO-V-002...
-    name:        str = Field(max_length=100)
-    lat:         float = Field(ge=-90,  le=90)
-    lon:         float = Field(ge=-180, le=180)
-    location:    Optional[str] = Field(None, max_length=200)
-    roof_area_m2: float = Field(gt=0, description="Área de captación del techo en m²")
-
+    device_code: str = Field(pattern=r"^HV-[A-Z]{3}-\d{3}$", description="Código del dispositivo, ej: HV-NEZ-001")
+    zone_id:     int = Field(description="ID de la zona a la que pertenece")
+    latitude:    float = Field(ge=-90,  le=90)
+    longitude:   float = Field(ge=-180, le=180)
+    firmware_version: str = Field(max_length=20)
+    status:      str = Field(default="active")
+    cistern_capacity_liters: float = Field(default=1100.0, gt=0)
+    cistern_height_cm: float = Field(default=120.0, gt=0)
 
 class DeviceUpdateSchema(BaseModel):
-    name:         Optional[str]  = Field(None, max_length=100)
-    location:     Optional[str]  = Field(None, max_length=200)
-    roof_area_m2: Optional[float] = Field(None, gt=0)
-    is_active:    Optional[bool]  = None
-
+    latitude:    Optional[float] = Field(None, ge=-90, le=90)
+    longitude:   Optional[float] = Field(None, ge=-180, le=180)
+    status:      Optional[str] = None
+    firmware_version: Optional[str] = None
+    cistern_capacity_liters: Optional[float] = Field(None, gt=0)
+    cistern_height_cm: Optional[float] = Field(None, gt=0)
 
 class DeviceResponseSchema(BaseModel):
     id:           int
-    device_id:    str
-    name:         str
-    lat:          float
-    lon:          float
-    location:     Optional[str]
-    roof_area_m2: float
-    is_active:    bool
-    created_at:   datetime
-    last_seen:    Optional[datetime]
+    zone_id:      int
+    device_code:  str
+    latitude:     float
+    longitude:    float
+    status:       str
+    firmware_version: str
+    cistern_capacity_liters: float
+    cistern_height_cm: float
+    installed_at: datetime
+    last_seen_at: Optional[datetime]
 
     model_config = {"from_attributes": True}

@@ -7,8 +7,7 @@ from app.schemas.telemetry import (
     TelemetryListSchema,
 )
 from app.schemas.alert import (
-    EmergencyAlertCreateSchema,
-    EmergencyAlertResponseSchema,
+    AlertResponseSchema,
     AlertListSchema,
     AlertResolveSchema,
 )
@@ -31,8 +30,7 @@ __all__ = [
     "SystemStateSchema",
     "TelemetryResponseSchema",
     "TelemetryListSchema",
-    "EmergencyAlertCreateSchema",
-    "EmergencyAlertResponseSchema",
+    "AlertResponseSchema",
     "AlertListSchema",
     "AlertResolveSchema",
     "DeviceCreateSchema",

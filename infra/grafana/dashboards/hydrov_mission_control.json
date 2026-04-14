@@ -33,9 +33,9 @@
       "pluginId": "postgres"
     }
   ],
-  "title": "🛰️ HYDRO-V — Mission Control",
+  "title": "\ud83d\udef0\ufe0f HYDRO-V \u2014 Mission Control",
   "uid": "hydrov-mission-control",
-  "description": "Control center principal del sistema Hydro-V. Telemetría en tiempo real, estado FSM, calidad del agua y mapa de nodos.",
+  "description": "Control center principal del sistema Hydro-V. Telemetr\u00eda en tiempo real, estado FSM, calidad del agua y mapa de nodos.",
   "tags": [
     "hydrov",
     "telemetry",
@@ -121,7 +121,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state\")\n  |> last()",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"device_state\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"fsm_state\")\n  |> last()",
           "datasource": {
             "type": "influxdb",
             "uid": "hydrov-influx-telemetry"
@@ -150,27 +150,27 @@
               "type": "value",
               "options": {
                 "IDLE": {
-                  "text": "⏸  IDLE",
+                  "text": "\u23f8  IDLE",
                   "color": "#9E9E9E",
                   "index": 0
                 },
                 "ANALYZING": {
-                  "text": "🔬 ANALIZANDO",
+                  "text": "\ud83d\udd2c ANALIZANDO",
                   "color": "#2196F3",
                   "index": 1
                 },
                 "HARVESTING": {
-                  "text": "💧 COSECHANDO",
+                  "text": "\ud83d\udca7 COSECHANDO",
                   "color": "#4CAF50",
                   "index": 2
                 },
                 "FULL_TANK": {
-                  "text": "✅ CISTERNA LLENA",
+                  "text": "\u2705 CISTERNA LLENA",
                   "color": "#00BCD4",
                   "index": 3
                 },
                 "EMERGENCY": {
-                  "text": "🚨 EMERGENCIA",
+                  "text": "\ud83d\udea8 EMERGENCIA",
                   "color": "#F44336",
                   "index": 4
                 }
@@ -194,7 +194,7 @@
     },
     {
       "id": 2,
-      "title": "💧 Nivel de Cisterna",
+      "title": "\ud83d\udca7 Nivel de Cisterna",
       "type": "gauge",
       "gridPos": {
         "h": 8,
@@ -209,7 +209,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> last()\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> last()\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))"
         }
       ],
       "options": {
@@ -258,7 +258,7 @@
     },
     {
       "id": 3,
-      "title": "🌊 Turbidez del Agua",
+      "title": "\ud83c\udf0a Turbidez del Agua",
       "type": "gauge",
       "gridPos": {
         "h": 8,
@@ -273,7 +273,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> last()"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> last()"
         }
       ],
       "options": {
@@ -323,7 +323,7 @@
                 "from": 0,
                 "to": 5,
                 "result": {
-                  "text": "LIMPIA ✓",
+                  "text": "LIMPIA \u2713",
                   "color": "#4CAF50"
                 }
               }
@@ -356,7 +356,7 @@
                 "from": 50,
                 "to": 9999,
                 "result": {
-                  "text": "RECHAZADA ✗",
+                  "text": "RECHAZADA \u2717",
                   "color": "#F44336"
                 }
               }
@@ -367,7 +367,7 @@
     },
     {
       "id": 4,
-      "title": "🚿 Caudal Actual",
+      "title": "\ud83d\udebf Caudal Actual",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -382,7 +382,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> aggregateWindow(every: 30s, fn: mean)"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> aggregateWindow(every: 30s, fn: mean)"
         }
       ],
       "options": {
@@ -421,7 +421,7 @@
     },
     {
       "id": 5,
-      "title": "📦 Volumen Total Captado",
+      "title": "\ud83d\udce6 Volumen Total Captado",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -436,7 +436,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_total_liters\")\n  |> last()"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"flow_total_liters\")\n  |> last()"
         }
       ],
       "options": {
@@ -473,7 +473,7 @@
     },
     {
       "id": 9,
-      "title": "🔧 Ciclos de Válvulas",
+      "title": "\ud83d\udd27 Ciclos de V\u00e1lvulas",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -488,12 +488,12 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()",
-          "legendFormat": "Admisión"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"intake_cycles\")\n  |> last()",
+          "legendFormat": "Admisi\u00f3n"
         },
         {
           "refId": "B",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"reject_cycles\")\n  |> last()",
           "legendFormat": "Rechazo"
         }
       ],
@@ -542,8 +542,8 @@
     },
     {
       "id": 12,
-      "title": "🤖 Autonomía Hídrica (IA)",
-      "description": "Predicción del modelo ML. Requiere tabla autonomy_predictions en PostgreSQL.",
+      "title": "\ud83e\udd16 Autonom\u00eda H\u00eddrica (IA)",
+      "description": "Predicci\u00f3n del modelo ML. Requiere tabla autonomy_predictions en PostgreSQL.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -552,15 +552,16 @@
         "y": 0
       },
       "datasource": {
-        "type": "postgres",
-        "uid": "hydrov-postgres"
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
       },
       "targets": [
         {
           "refId": "A",
-          "rawQuery": true,
-          "rawSql": "SELECT days_autonomy AS value, created_at AS time FROM autonomy_predictions WHERE node_id = '${device_id}' ORDER BY created_at DESC LIMIT 1",
-          "format": "time_series"
+          "type": "json",
+          "source": "url",
+          "url": "/api/v1/predictions/${device_id}/autonomy",
+          "format": "table"
         }
       ],
       "options": {
@@ -577,7 +578,7 @@
         "defaults": {
           "unit": "short",
           "decimals": 1,
-          "displayName": "días",
+          "displayName": "d\u00edas",
           "color": {
             "mode": "thresholds"
           },
@@ -607,7 +608,7 @@
     },
     {
       "id": 6,
-      "title": "📈 Turbidez en el Tiempo — NOM-127-SSA1-1994 (5 NTU)",
+      "title": "\ud83d\udcc8 Turbidez en el Tiempo \u2014 NOM-127-SSA1-1994 (5 NTU)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -622,7 +623,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"turbidity_ntu\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
           "legendFormat": "Turbidez (NTU)"
         }
       ],
@@ -682,7 +683,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Límite NOM-127 (5 NTU)"
+              "options": "L\u00edmite NOM-127 (5 NTU)"
             },
             "properties": [
               {
@@ -717,7 +718,7 @@
     },
     {
       "id": 7,
-      "title": "📊 Flujo (L/min) y Nivel de Cisterna (%)",
+      "title": "\ud83d\udcca Flujo (L/min) y Nivel de Cisterna (%)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -732,12 +733,12 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"flow_lpm\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> aggregateWindow(every: $__interval, fn: mean)",
           "legendFormat": "Flujo (L/min)"
         },
         {
           "refId": "B",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))\n  |> aggregateWindow(every: $__interval, fn: mean)",
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._field == \"distance_cm\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> map(fn: (r) => ({r with _value: (100.0 - r._value) / 100.0 * 100.0}))\n  |> aggregateWindow(every: $__interval, fn: mean)",
           "legendFormat": "Nivel Cisterna (%)"
         }
       ],
@@ -811,7 +812,7 @@
     },
     {
       "id": 8,
-      "title": "⏱️ Tiempo en Cada Estado FSM",
+      "title": "\u23f1\ufe0f Tiempo en Cada Estado FSM",
       "type": "barchart",
       "gridPos": {
         "h": 8,
@@ -826,7 +827,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_telemetry\")\n  |> filter(fn: (r) => r.node_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state_duration_ms\")\n  |> group(columns: [\"fsm_state\"])\n  |> sum()\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0 / 60.0}))"
+          "query": "from(bucket: \"sensor_telemetry\")\n  |> range(start: v.timeRangeStart, stop: $__timeTo())\n  |> filter(fn: (r) => r._measurement == \"sensor_reading\")\n  |> filter(fn: (r) => r.device_id == \"${device_id}\")\n  |> filter(fn: (r) => r._field == \"state_duration_ms\")\n  |> group(columns: [\"fsm_state\"])\n  |> sum()\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0 / 60.0}))"
         }
       ],
       "options": {
@@ -861,7 +862,7 @@
     },
     {
       "id": 10,
-      "title": "🗺️ Mapa de Nodos Hydro-V — Nezahualcóyotl",
+      "title": "\ud83d\uddfa\ufe0f Mapa de Nodos Hydro-V \u2014 Nezahualc\u00f3yotl",
       "type": "geomap",
       "gridPos": {
         "h": 8,
@@ -966,7 +967,7 @@
     },
     {
       "id": 11,
-      "title": "🚨 Alertas de Emergencia Recientes",
+      "title": "\ud83d\udea8 Alertas de Emergencia Recientes",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -982,7 +983,7 @@
         {
           "refId": "A",
           "rawQuery": true,
-          "rawSql": "SELECT node_id AS \"Nodo\", timestamp AT TIME ZONE 'America/Mexico_City' AS \"Hora (CDMX)\", error_count AS \"Errores\", state_duration_ms / 1000 AS \"Duración (s)\", resolved AS \"Resuelta\" FROM emergency_alerts ORDER BY timestamp DESC LIMIT 20",
+          "rawSql": "SELECT node_id AS \"Nodo\", timestamp AT TIME ZONE 'America/Mexico_City' AS \"Hora (CDMX)\", error_count AS \"Errores\", state_duration_ms / 1000 AS \"Duraci\u00f3n (s)\", resolved AS \"Resuelta\" FROM emergency_alerts ORDER BY timestamp DESC LIMIT 20",
           "format": "table"
         }
       ],
@@ -1023,7 +1024,7 @@
                     "type": "value",
                     "options": {
                       "true": {
-                        "text": "✅ Sí",
+                        "text": "\u2705 S\u00ed",
                         "color": "#4CAF50"
                       }
                     }
@@ -1032,7 +1033,7 @@
                     "type": "value",
                     "options": {
                       "false": {
-                        "text": "🚨 No",
+                        "text": "\ud83d\udea8 No",
                         "color": "#F44336"
                       }
                     }

@@ -9,6 +9,7 @@
 #include "dsp_filters.h"
 #include "hal_actuators.h"
 #include "fsm_logic.h"
+#include "fsm_core.h"
 #include "net_mqtt.h"
 #include "telemetry.h"
 #include "storage_fs.h"
@@ -212,6 +213,17 @@ void setup() {
 // LOOP
 // ============================================================================
 void loop() {
-  // El scheduler de FreeRTOS se encarga de todo
-  vTaskDelay(pdMS_TO_TICKS(10000));
+  static uint32_t iterationCount = 0;
+
+  // Ciclo principal de la máquina de estados
+  runCoreFSMCycle();
+
+  // Auditoría visual (Heartbeat FSM) cada 5 iteraciones
+  iterationCount++;
+  if (iterationCount % 5 == 0) {
+    Serial.println("[FSM] Ciclo core ejecutado");
+  }
+
+  // Safety: delay no bloqueante para ceder CPU al WDT y FreeRTOS scheduler
+  vTaskDelay(pdMS_TO_TICKS(2000));
 }

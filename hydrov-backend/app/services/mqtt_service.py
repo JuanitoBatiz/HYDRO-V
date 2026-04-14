@@ -45,8 +45,8 @@ async def handle_emergency(
                     await conn.execute(
                         """
                         INSERT INTO alerts
-                            (device_id, alert_type_id, severity, confidence_score, description, payload_snapshot, detected_at)
-                        VALUES ($1, $2, 'critical', 1.0, 'Estado EMERGENCY detectado en FSM del ESP32', $3::jsonb, $4)
+                            (device_id, alert_type_id, severity, confidence_score, description, payload_snapshot, detected_at, is_resolved)
+                        VALUES ($1, $2, 'critical', 1.0, 'Estado EMERGENCY detectado en FSM del ESP32', $3::jsonb, $4, FALSE)
                         """,
                         db_device_id,
                         alert_type_id,
@@ -95,24 +95,45 @@ async def process_message(
     try:
         raw     = json.loads(message.payload.decode())
         payload = ESP32PayloadSchema(**raw)
-        
+
         device_code = payload.device_code
 
-        # ── 1. Update Latest State Cache in Redis ───────────────
-        await redis_service.update_device_state(payload)
+        # --- Cálculo de nivel de Cisterna para Redis (G-07) ---
+        meta = await device_cache.get_device_metadata(device_code)
+        tank_height = meta["cistern_height_cm"] if meta else 125.0
+        zone_code   = meta.get("zone_code") if meta else None  # I-02
 
-        # ── 2. Escribe en InfluxDB (measurements separadas) ──────
-        await influx_service.write_telemetry(payload)
-        
-        # Opcional log debug
-        # logger.debug(f"[MQTT] Telemetría procesada | device={device_code} state={payload.system_state.state}")
+        water_level = max(0.0, tank_height - payload.sensors.distance_cm)
+        percent = (water_level / tank_height) * 100.0
+        tank_level_pct = max(0.0, min(100.0, round(percent, 2)))
+
+        # ── 1. Update Latest State Cache in Redis ───────────────
+        await redis_service.update_device_state(payload, tank_level_pct=tank_level_pct)
+
+        # ── 2. Escribe en InfluxDB — con zone_code como tag (I-02) ──
+        await influx_service.write_telemetry(payload, zone_code=zone_code)
 
         # ── 3. Handler de emergencia ─────────────────────────────
         if payload.system_state.state == "EMERGENCY":
             await handle_emergency(payload, pg_pool, device_cache, mqtt_client)
 
-        # ── 4. Actualizar last_seen_at en PG (Opcional pero útil) ──
-        # Lo haremos en backend job o de manera menos intensiva que un update per-packet.
+        # ── 4. Actualizar last_seen_at en PG con throttle de 60 s (I-03) ──
+        throttle_key = f"pg:last_seen_update:{device_code}"
+        try:
+            already_updated = await redis_service.redis_client.exists(throttle_key)
+            if not already_updated:
+                # Han pasado más de 60 s (o nunca se actualizó): ejecutar UPDATE
+                async with pg_pool.acquire() as conn:
+                    await conn.execute(
+                        "UPDATE devices SET last_seen_at = $1 WHERE device_code = $2",
+                        payload.received_at,
+                        device_code,
+                    )
+                # Marcar timer en Redis con TTL de 60 segundos
+                await redis_service.redis_client.setex(throttle_key, 60, "1")
+                logger.debug(f"[MQTT] last_seen_at actualizado en PG | device={device_code}")
+        except Exception as e:
+            logger.warning(f"[MQTT] Error en throttle last_seen_at para {device_code}: {e}")
 
     except Exception as e:
         logger.error(f"[MQTT] Error procesando mensaje: {e}")

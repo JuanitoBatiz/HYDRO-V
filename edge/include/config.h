@@ -39,4 +39,12 @@
 #define FLOW_PULSES_PER_LITER   450     // Calibración YF-S201
 #define ULTRASONIC_TIMEOUT_US   30000   // Timeout para lectura (aprox 5 metros máximo)
 
+// ============================================
+// DERIVATIVE ALGORITHM CONSTANTS (dT/dt)
+// ============================================
+#define DTDT_WINDOW_SIZE 5           // Tamaño del buffer para calcular la derivada
+#define DTDT_REJECT_THRESHOLD -8.0f  // NTU/s: umbral negativo fuerte (agua aclarándose)
+#define TURBIDITY_INITIAL_FLOOR 80.0f // NTU mínimo para considerar presencia de sedimentos
+#define TURBIDITY_ACCEPT_HARD 15.0f   // NTU: agua cristalina, admitir siempre
+
 #endif // CONFIG_H

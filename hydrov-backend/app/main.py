@@ -179,8 +179,8 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────
 #  Routers
 # ─────────────────────────────────────────────────────────────────
-# from app.api.v1.router import api_v1_router  # noqa: E402 — después del app
-# app.include_router(api_v1_router, prefix="/api/v1")
+from app.api.v1.router import api_v1_router  # noqa: E402 — después del app
+app.include_router(api_v1_router, prefix="/api/v1")
 
 
 # ─────────────────────────────────────────────────────────────────

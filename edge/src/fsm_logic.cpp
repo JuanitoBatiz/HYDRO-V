@@ -6,6 +6,46 @@
 static FSMContext_t fsm;
 static uint32_t stateStartTime = 0; // Para calcular la duración
 
+bool forceHarvestMode = false;
+bool forceIdleMode = false;
+
+// Variables y lógica para cálculo de derivada (dT/dt)
+float current_dtdt = 0.0f;
+static float turbidityHistory[DTDT_WINDOW_SIZE];
+static uint32_t timeHistory[DTDT_WINDOW_SIZE];
+static int historyIndex = 0;
+static bool historyFull = false;
+
+float computeDtDt(float newReading) {
+    uint32_t now = millis();
+    
+    turbidityHistory[historyIndex] = newReading;
+    timeHistory[historyIndex] = now;
+    
+    historyIndex++;
+    if (historyIndex >= DTDT_WINDOW_SIZE) {
+        historyIndex = 0;
+        historyFull = true;
+    }
+    
+    if (!historyFull) {
+        return 0.0f;
+    }
+    
+    int oldestIndex = historyIndex; 
+    float oldestTurbidity = turbidityHistory[oldestIndex];
+    uint32_t oldestTime = timeHistory[oldestIndex];
+    
+    float deltaT = newReading - oldestTurbidity;
+    float deltaSeconds = (now - oldestTime) / 1000.0f;
+    
+    if (deltaSeconds <= 0.0f) {
+        return 0.0f; 
+    }
+    
+    return deltaT / deltaSeconds;
+}
+
 void initFSM() {
     fsm.currentState = SYSTEM_IDLE;
     fsm.state_duration = 0;
@@ -19,15 +59,33 @@ void initFSM() {
 void updateSystemState(float turbidity, float distanceCm) {
     SystemState nextState = fsm.currentState;
 
+    // 0. Calcular derivada
+    current_dtdt = computeDtDt(turbidity);
+
     // 1. Evaluar sensores para decidir el siguiente paso
-    if (turbidity > 500.0) { 
-        nextState = WATER_REJECT;
-    } 
-    else if (distanceCm > 100.0) { 
-        nextState = WATER_INTAKE;
-    } 
-    else {
+    if (distanceCm <= 100.0) {
+        // Caso 4: Cisterna Llena (siempre prioritario de hardware)
         nextState = SYSTEM_IDLE;
+    } 
+    else if (forceIdleMode) {
+        // Control Manual Remoto
+        nextState = SYSTEM_IDLE;
+    }
+    else if (forceHarvestMode) {
+        // Control Manual Remoto
+        nextState = WATER_INTAKE;
+    }
+    else if (turbidity < TURBIDITY_ACCEPT_HARD) {
+        // Caso 1: Agua cristalina
+        nextState = WATER_INTAKE;
+    }
+    else if (turbidity < TURBIDITY_INITIAL_FLOOR && current_dtdt < DTDT_REJECT_THRESHOLD) {
+        // Caso 2: Agua aclarándose rápido
+        nextState = WATER_INTAKE;
+    }
+    else {
+        // Caso 3 y fallback: Turbidez alta o no aclarándose rápido
+        nextState = WATER_REJECT;
     }
 
     // 2. Si hay un CAMBIO de estado, hacemos la transición
@@ -75,4 +133,8 @@ const char* getStateNameString(SystemState state) {
 // Solución al error de "too few arguments"
 const char* getStateNameString() {
     return getStateNameString(fsm.currentState);
+}
+
+void resetFsmErrors() {
+    fsm.error_count = 0;
 }

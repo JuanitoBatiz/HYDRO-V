@@ -14,8 +14,8 @@ class Device(Base):
     longitude: Mapped[float] = mapped_column(Float, CheckConstraint("longitude >= -180 AND longitude <= 180", name="chk_device_f06d62"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), CheckConstraint("status IN ('active', 'inactive', 'maintenance')", name="chk_device_069243"), nullable=False, index=True)
     firmware_version: Mapped[str] = mapped_column(String(20), nullable=False)
-    cistern_capacity_liters: Mapped[float] = mapped_column(Float, CheckConstraint("cistern_capacity_liters > 0", name="chk_device_f5aa89"), default=1100.0, nullable=False)
-    cistern_height_cm: Mapped[float] = mapped_column(Float, CheckConstraint("cistern_height_cm > 0", name="chk_device_e14215"), default=120.0, nullable=False)
+    cistern_capacity_liters: Mapped[float] = mapped_column(Float, CheckConstraint("cistern_capacity_liters > 0", name="chk_device_f5aa89"), default=3400.0, server_default="3400.0", nullable=False)
+    cistern_height_cm: Mapped[float] = mapped_column(Float, CheckConstraint("cistern_height_cm > 0", name="chk_device_e14215"), default=125.0, server_default="125.0", nullable=False)
     installed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 

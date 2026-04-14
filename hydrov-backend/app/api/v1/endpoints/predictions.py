@@ -23,8 +23,8 @@ router = APIRouter()
 async def predict_autonomy(
     node_id:   str,
     level_pct: float = Query(
-        ..., ge=0.0, le=100.0,
-        description="Nivel actual de la cisterna en porcentaje (0-100)"
+        None, ge=0.0, le=100.0,
+        description="Nivel actual de la cisterna en porcentaje (0-100). Si no se envía, usa Redis."
     ),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -47,7 +47,7 @@ async def predict_autonomy(
     ```
     """
     # Verificar que el nodo existe
-    result = await db.execute(select(Device).where(Device.device_id == node_id))
+    result = await db.execute(select(Device).where(Device.device_code == node_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -60,6 +60,17 @@ async def predict_autonomy(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Nodo '{node_id}' está inactivo",
         )
+
+    if level_pct is None:
+        import json
+        from app.services.redis_service import redis_service
+        data = await redis_service.redis_client.get(f"sensor:latest:{node_id}")
+        if not data:
+            raise HTTPException(400, "level_pct no proveído por querystring y sin registro en Redis")
+        sensors = json.loads(data).get("sensors", {})
+        distance = float(sensors.get("distance_cm", 0))
+        computed = (1.0 - (distance / 200.0)) * 100.0
+        level_pct = max(0.0, min(100.0, computed))
 
     try:
         prediction = await ml_service.get_autonomy_prediction(
@@ -88,8 +99,8 @@ async def predict_autonomy(
 )
 async def detect_leaks(
     node_id:   str,
-    flow_lpm:  float = Query(..., ge=0.0, description="Flujo actual en litros/minuto"),
-    level_pct: float = Query(..., ge=0.0, le=100.0, description="Nivel actual en %"),
+    flow_lpm:  float = Query(None, ge=0.0, description="Flujo actual en litros/minuto"),
+    level_pct: float = Query(None, ge=0.0, le=100.0, description="Nivel actual en %"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> dict:
@@ -108,7 +119,7 @@ async def detect_leaks(
     ```
     Un `anomaly_score` > 0.75 indica fuga probable.
     """
-    result = await db.execute(select(Device).where(Device.device_id == node_id))
+    result = await db.execute(select(Device).where(Device.device_code == node_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -116,6 +127,20 @@ async def detect_leaks(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Nodo '{node_id}' no encontrado",
         )
+
+    if level_pct is None or flow_lpm is None:
+        import json
+        from app.services.redis_service import redis_service
+        data = await redis_service.redis_client.get(f"sensor:latest:{node_id}")
+        if not data:
+            raise HTTPException(400, "level_pct o flow_lpm no proveídos y sin registro en Redis")
+        sensors = json.loads(data).get("sensors", {})
+        if level_pct is None:
+            distance = float(sensors.get("distance_cm", 0))
+            computed = (1.0 - (distance / 200.0)) * 100.0
+            level_pct = max(0.0, min(100.0, computed))
+        if flow_lpm is None:
+            flow_lpm = float(sensors.get("flow_lpm", 0))
 
     try:
         detection = await ml_service.get_leak_detection(
@@ -143,8 +168,8 @@ async def detect_leaks(
 )
 async def full_prediction(
     node_id:   str,
-    level_pct: float = Query(..., ge=0.0, le=100.0),
-    flow_lpm:  float = Query(..., ge=0.0),
+    level_pct: float = Query(None, ge=0.0, le=100.0),
+    flow_lpm:  float = Query(None, ge=0.0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> dict:
@@ -152,11 +177,25 @@ async def full_prediction(
     Combina autonomía hídrica + detección de fugas en una sola petición.
     Diseñado para el widget de estado del dashboard que necesita ambas métricas.
     """
-    result = await db.execute(select(Device).where(Device.device_id == node_id))
+    result = await db.execute(select(Device).where(Device.device_code == node_id))
     device = result.scalar_one_or_none()
 
     if not device:
         raise HTTPException(status_code=404, detail=f"Nodo '{node_id}' no encontrado")
+
+    if level_pct is None or flow_lpm is None:
+        import json
+        from app.services.redis_service import redis_service
+        data = await redis_service.redis_client.get(f"sensor:latest:{node_id}")
+        if not data:
+            raise HTTPException(400, "level_pct o flow_lpm no proveídos y sin registro en Redis")
+        sensors = json.loads(data).get("sensors", {})
+        if level_pct is None:
+            distance = float(sensors.get("distance_cm", 0))
+            computed = (1.0 - (distance / 200.0)) * 100.0
+            level_pct = max(0.0, min(100.0, computed))
+        if flow_lpm is None:
+            flow_lpm = float(sensors.get("flow_lpm", 0))
 
     autonomy = await ml_service.get_autonomy_prediction(
         node_id=node_id, level_pct=level_pct, lat=device.lat, lon=device.lon,
