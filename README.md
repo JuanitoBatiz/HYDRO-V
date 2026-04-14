@@ -983,8 +983,8 @@ El roadmap hacia **TRL 7-9** incluye:
 
 | Rol | Nombre | Contacto |
 |-----|--------|---------|
-| **Autor / Desarrollador Principal** | [Tu Nombre Completo] | [tu.email@ejemplo.com] |
-| **Asesor** | [Nombre del Asesor] | [asesor@ejemplo.com] |
+| **Autores / Desarrolladores** | Cruz Pérez Jesús Emmanuel<br>Curiel García Juan Jesús | emmancruz0831@gmail.com<br>curielgarciajuanjesus@gmail.com |
+| **Asesor** | Pérez Montes Rubén Enain | +52 55 2296 1094 |
 
 ---
 
