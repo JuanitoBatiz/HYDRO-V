@@ -29,7 +29,7 @@
 #define MQTT_USE_TLS            true
 
 // MQTT Topics
-#define MQTT_TOPIC_TELEMETRY    "hydrov/neza/001/telemetry"
+#define MQTT_TOPIC_TELEMETRY    "hydrov/HYDRO-V-001/telemetry"
 #define MQTT_TOPIC_COMMANDS     "hydrov/HYDRO-V-001/commands"
 
 // ============================================

@@ -5,7 +5,7 @@ import type { TelemetryPayload, TelemetryHistory, HistoricalDataPoint } from '@/
 const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL || 'wss://localhost:8884/mqtt';
 const MQTT_USER  = import.meta.env.VITE_MQTT_USER || '';
 const MQTT_PASS  = import.meta.env.VITE_MQTT_PASS || '';
-const TOPIC = import.meta.env.VITE_MQTT_TOPIC || 'hydrov/+/+/telemetry';
+const TOPIC = import.meta.env.VITE_MQTT_TOPIC || 'hydrov/+/telemetry';
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
