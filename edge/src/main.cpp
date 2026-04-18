@@ -141,6 +141,18 @@ void setup() {
   Serial.begin(115200);
   initFS();
   delay(2000);
+
+  // --- PRUEBA VALVULA ---
+  pinMode(4, OUTPUT);
+  Serial.println("[SISTEMA] CERRANDO VÁLVULA");
+  digitalWrite(4, LOW);
+  delay(4000);
+  Serial.println("[SISTEMA] INTENTANDO ABRIR VÁLVULA");
+  digitalWrite(4, HIGH);
+  delay(1000);
+  Serial.println("[SISTEMA] CERRANDO VÁLVULA");
+  digitalWrite(4, LOW);
+  // --- PRUEBA VALVULA ---
   
   Serial.println("\n");
   Serial.println("================================");
@@ -187,8 +199,9 @@ void setup() {
   // Crear tarea MQTT (Core 1, Prioridad 2)
   xTaskCreatePinnedToCore(
     taskMQTT,
+    
     "TaskMQTT",
-    4096,
+    8192,
     nullptr,
     2,
     nullptr,

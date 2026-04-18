@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from src.models.linear_autonomy import AutonomyPredictor
+from models.linear_autonomy import AutonomyPredictor
 
 
 # ── Configuración ─────────────────────────────────────────────

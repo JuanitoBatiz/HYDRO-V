@@ -37,7 +37,7 @@ services:
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
-      - ./infra/db/init_influxdb.sh:/docker-entrypoint-initdb.d/init_influxdb.sh:ro
+      - influxdb_config:/etc/influxdb2
     ports:
       - "8086:8086"
     healthcheck:

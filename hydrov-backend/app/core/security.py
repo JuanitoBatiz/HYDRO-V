@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
+# from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
@@ -12,7 +13,7 @@ from app.schemas.user import TokenPayloadSchema
 
 
 # ── Bcrypt context ────────────────────────────────────────────────
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ── OAuth2 scheme — apunta al futuro endpoint de login ────────────
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -25,22 +26,19 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 def hash_password(plain_password: str) -> str:
     """
     Genera el hash bcrypt de una contraseña en texto plano.
-
-    Uso al registrar un usuario:
-        user.hashed_password = hash_password(password)
     """
-    return _pwd_context.hash(plain_password)
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(plain_password.encode('utf-8'), salt).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifica que una contraseña en texto plano coincide con su hash bcrypt.
-
-    Uso en el endpoint de login:
-        if not verify_password(form.password, user.hashed_password):
-            raise HTTPException(401, "Credenciales inválidas")
     """
-    return _pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except ValueError:
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────

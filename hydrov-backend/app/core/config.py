@@ -93,9 +93,10 @@ class Settings(BaseSettings):
     WS_ALERT_CHANNEL: str = "alerts:{node_id}"  # canal Redis pub/sub
 
     class Config:
-        env_file         = ".env"
+        env_file          = ".env"
         env_file_encoding = "utf-8"
-        case_sensitive   = True
+        case_sensitive    = True
+        extra             = "ignore"   # Ignora vars del .env no declaradas (ej. REDIS_URL calculada como @property)
 
 
 @lru_cache()

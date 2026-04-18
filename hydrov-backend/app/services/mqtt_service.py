@@ -3,6 +3,8 @@ import asyncio
 import json
 import uuid
 import asyncpg
+# import aioredis
+import redis.asyncio as aioredis
 import aiomqtt
 from datetime import datetime
 from app.core.config import settings
@@ -157,7 +159,7 @@ async def mqtt_to_influx_loop(pg_pool: asyncpg.Pool) -> None:
                 username=settings.MQTT_USER,
                 password=settings.MQTT_PASSWORD,
                 tls_params=aiomqtt.TLSParameters(),
-                client_id=unique_client_id,
+                identifier=settings.MQTT_CLIENT_ID,
             ) as client:
                 await client.subscribe(settings.MQTT_TOPIC_TELEMETRY, qos=1)
                 logger.info(f"[MQTT] Conectado y suscrito a {settings.MQTT_TOPIC_TELEMETRY} con ID {unique_client_id}")
