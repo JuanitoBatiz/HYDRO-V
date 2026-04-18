@@ -149,8 +149,9 @@ static void phaseSenseWater() {
     // ── Turbidez ───────────────────────────────────────────────────────────
     uint16_t rawAdc         = readTurbidityRaw();
     uint16_t filteredAdc    = getFilteredTurbidity(rawAdc);
-    // Escala de 0–4095 (12-bit ADC) a 0–1000 NTU (calibración lineal simple)
-    latestReading.turbidity_ntu = (float)filteredAdc * (1000.0f / TURBIDITY_ADC_MAX);
+    Serial.printf("[FSM_Core][TURB] raw=%u | filtered=%u\n", rawAdc, filteredAdc);
+    // Escala invertida de 0–4095 (12-bit ADC) a 1000–0 NTU
+    latestReading.turbidity_ntu = (4095.0f - (float)filteredAdc) * (1000.0f / TURBIDITY_ADC_MAX);
 
     // ── Distancia / Nivel de Cisterna ──────────────────────────────────────
     float rawDistance   = readUltrasonicDistance();
@@ -185,7 +186,14 @@ static void phaseSenseWater() {
     // ── Actualizar la FSM de válvulas con los datos frescos ────────────────
     // updateSystemState está en fsm_logic.cpp y mueve los relés físicos
     // según las reglas de turbidez y nivel de cistena.
-    updateSystemState(latestReading.turbidity_ntu, latestReading.distance_cm);
+    // updateSystemState(latestReading.turbidity_ntu, latestReading.distance_cm);
+
+    // ── Regla local de válvula de admisión por umbral de turbidez ───────────
+    if (latestReading.turbidity_ntu < 30.0f) {
+        openValveIntake();
+    } else {
+        closeValveIntake();
+    }
 }
 
 // ============================================================================

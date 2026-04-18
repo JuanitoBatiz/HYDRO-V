@@ -28,12 +28,22 @@ bool isValveRejectOpen() {
 }
 
 void openValveIntake() {
+	if (valveIntakeOpen) {
+		return;
+	}
+
+	Serial.println("[VALVULA] ABRIENDO");
 	digitalWrite(PIN_VALVE_INTAKE, LOW);
 	valveIntakeOpen = true;
 	lastStateChange = millis();
 }
 
 void closeValveIntake() {
+	if (!valveIntakeOpen) {
+		return;
+	}
+
+	Serial.println("[VALVULA] CERRANDO");
 	digitalWrite(PIN_VALVE_INTAKE, HIGH);
 	valveIntakeOpen = false;
 	lastStateChange = millis();

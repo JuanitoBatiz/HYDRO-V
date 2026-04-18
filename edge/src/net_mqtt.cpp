@@ -2,18 +2,141 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 #include "config.h"
 #include "storage_fs.h"
 #include "fsm_logic.h"
 
 namespace {
-WiFiClient espClient;
+WiFiClientSecure espClient;
 volatile bool wifiConnected = false;
 volatile bool mqttConnected = false;
+volatile bool timeSynced = false;
+bool ntpConfigured = false;
+bool sslReady = false;
+bool tlsInsecureMode = false;
+bool mqttConnectInProgress = false;
+
+const char *root_ca = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+)EOF";
+
+
+bool hasValidTime() {
+	time_t now = time(nullptr);
+	return now > 1000000000;
+}
+
+void applyTlsPolicyForCurrentTime() {
+	time_t now = time(nullptr);
+
+	if (now < 1000000000) {
+		if (!tlsInsecureMode) {
+			espClient.setInsecure();
+			tlsInsecureMode = true;
+			sslReady = false;
+			Serial.println("[SSL][WARN] Hora invalida: usando modo inseguro temporal");
+		}
+		return;
+	}
+
+	if (!sslReady || tlsInsecureMode) {
+		espClient.setCACert(root_ca);
+		sslReady = true;
+		tlsInsecureMode = false;
+		Serial.println("[SSL] Root CA cargado correctamente");
+	}
+}
+
+void configureNtp() {
+	if (ntpConfigured) {
+		return;
+	}
+
+	configTime(NTP_TIME_OFFSET_SECONDS, 0,
+	           NTP_SERVER_PRIMARY,
+	           NTP_SERVER_SECONDARY,
+	           NTP_SERVER_TERTIARY);
+	ntpConfigured = true;
+	Serial.println("[NTP] SNTP configurado con pool.ntp.org, time.google.com y time.windows.com");
+}
+
+bool refreshTimeSyncState() {
+	if (hasValidTime()) {
+		if (!timeSynced) {
+			struct tm timeinfo;
+			if (getLocalTime(&timeinfo, 1000)) {
+				Serial.printf("[NTP] OK -> %04d-%02d-%02d %02d:%02d:%02d\n",
+				              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+				              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+			}
+		}
+		timeSynced = true;
+		return true;
+	}
+
+	return false;
+}
+
+} // namespace
+
+bool waitForValidTime(uint32_t timeoutMs) {
+	configureNtp();
+
+	unsigned long start = millis();
+	while ((millis() - start) < timeoutMs) {
+		if (refreshTimeSyncState()) {
+			return true;
+		}
+		vTaskDelay(pdMS_TO_TICKS(500));
+	}
+
+	refreshTimeSyncState();
+	if (!timeSynced) {
+		Serial.println("[NTP][ERROR] Timeout de sincronizacion: continuando sin hora valida");
+	}
+
+	return timeSynced;
+}
+
+bool isTimeSynced() {
+	return timeSynced;
+}
 
 void setupWiFi() {
 	Serial.println("[WiFi] Iniciando conexion...");
@@ -39,30 +162,55 @@ void setupWiFi() {
 }
 
 void reconnectMQTT() {
+    if (mqttClient.connected()) {
+        mqttConnected = true;
+        return;
+    }
+
+    if (mqttConnectInProgress) {
+        Serial.println("[MQTT] Conexion en progreso, evitando intento duplicado");
+        return;
+    }
+
+	mqttConnectInProgress = true;
+	refreshTimeSyncState();
+	applyTlsPolicyForCurrentTime();
+
 	int attempts = 0;
 	const int maxAttempts = 5;
 
 	while (!mqttClient.connected() && (attempts < maxAttempts)) {
+		if (espClient.connected()) {
+			Serial.println("[MQTT] Socket previo detectado, cerrando antes de reconectar");
+			espClient.stop();
+		}
+
 		Serial.print("[MQTT] Intentando conectar... ");
 		if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
 			Serial.println("Conectado!");
+			Serial.println("[MQTT] MQTT OK");
 			mqttConnected = true;
 			mqttClient.subscribe(MQTT_TOPIC_COMMANDS);
+			syncOfflineBuffer();
+			Serial.println("[MQTT] Buffer offline sincronizado tras conexion");
+			mqttConnectInProgress = false;
 			return;
 		}
 
 		Serial.print("Codigo de error: ");
 		Serial.println(mqttClient.state());
+		mqttClient.disconnect();
+		espClient.stop();
 		vTaskDelay(pdMS_TO_TICKS(2000));
 		attempts++;
 	}
 
 	mqttConnected = false;
+	mqttConnectInProgress = false;
 	if (attempts >= maxAttempts) {
 		Serial.println("[MQTT] No se pudo conectar despues de intentos");
 	}
 }
-} // namespace
 
 PubSubClient mqttClient(espClient);
 
@@ -125,17 +273,19 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 
 void initNetwork() {
 	setupWiFi();
+	configureNtp();
+	refreshTimeSyncState();
+	applyTlsPolicyForCurrentTime();
 
 	mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
 	mqttClient.setCallback(onMqttMessage);
 	mqttClient.setBufferSize(512);
 
-	if (wifiConnected) {
-		reconnectMQTT();
-	}
+	Serial.println("[MQTT] Cliente y callbacks configurados");
 }
 
 void maintainNetwork() {
+	refreshTimeSyncState();
 	wifiConnected = (WiFi.status() == WL_CONNECTED);
 	if (!wifiConnected) {
 		mqttConnected = false;

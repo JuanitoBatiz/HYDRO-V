@@ -5,6 +5,8 @@
 
 extern PubSubClient mqttClient;
 
+bool waitForValidTime(uint32_t timeoutMs = 20000);
+bool isTimeSynced();
 void initNetwork();
 void maintainNetwork();
 bool isNetworkConnected();

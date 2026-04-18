@@ -12,8 +12,12 @@ extern float current_dtdt;
 void publishTelemetryData(SensorData_t currentSensors) {
 	StaticJsonDocument<512> doc;
 
+	doc["device_code"] = MQTT_CLIENT_ID;
 	doc["device_id"] = MQTT_CLIENT_ID;
 	doc["timestamp"] = currentSensors.timestamp;
+	doc["flow_rate"] = currentSensors.flow_lpm;
+	doc["turbidity"] = currentSensors.turbidity_ntu;
+	doc["tds"] = currentSensors.turbidity_ntu;
 
 	JsonObject sensors = doc.createNestedObject("sensors");
 	sensors["turbidity_ntu"] = serialized(String(currentSensors.turbidity_ntu, 1));

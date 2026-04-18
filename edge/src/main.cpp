@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
@@ -40,8 +41,9 @@ void taskSensores(void* pvParameters) {
     // Leer turbidez (ADC), filtrar y convertir a NTU
     uint16_t turbidityRaw = readTurbidityRaw();
     uint16_t turbidityFiltered = getFilteredTurbidity(turbidityRaw);
-    // Conversión simple: escalar de 0-4095 a 0-1000 NTU
-    sensorData.turbidity_ntu = (float)turbidityFiltered * (1000.0 / TURBIDITY_ADC_MAX);
+    Serial.printf("[TaskSensores][TURB] raw=%u | filtered=%u\n", turbidityRaw, turbidityFiltered);
+    // Conversión invertida: 4095 -> 0 NTU y 0 -> 1000 NTU
+    sensorData.turbidity_ntu = (4095.0f - (float)turbidityFiltered) * (1000.0f / TURBIDITY_ADC_MAX);
     
     // Leer distancia del ultrasónico y filtrar ruido
     float distanceRaw = readUltrasonicDistance();
@@ -88,6 +90,11 @@ void taskMQTT(void* pvParameters) {
   SensorData_t sensorData;
 
   Serial.println("[TaskMQTT] Iniciada");
+
+  if (!isTimeSynced()) {
+    Serial.println("[TaskMQTT] Esperando NTP antes del primer MQTT...");
+    waitForValidTime(20000);
+  }
 
   while (1) {
     // Mantener conexion WiFi/MQTT activa y reconectar si se cae
@@ -139,7 +146,22 @@ void taskWiFiMonitor(void* pvParameters) {
 // ============================================================================
 void setup() {
   Serial.begin(115200);
-  initFS();
+  if (!LittleFS.begin(true)) {
+    Serial.println("[FS][WARN] LittleFS.begin(true) fallo, intentando format()...");
+    if (!LittleFS.format() || !LittleFS.begin()) {
+      Serial.println("[FS][ERROR] LittleFS no pudo inicializarse tras format()");
+    }
+  }
+
+  if (!LittleFS.exists("/offline_data.txt")) {
+    File offlineFile = LittleFS.open("/offline_data.txt", FILE_WRITE);
+    if (offlineFile) {
+      offlineFile.close();
+      Serial.println("[FS] Archivo /offline_data.txt creado");
+    } else {
+      Serial.println("[FS][ERROR] No se pudo crear /offline_data.txt");
+    }
+  }
   delay(2000);
 
   // --- PRUEBA VALVULA ---
@@ -195,7 +217,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     taskSensores,
     "TaskSensores",
-    4096,
+    3072,
     nullptr,
     2,
     nullptr,
@@ -207,7 +229,7 @@ void setup() {
     taskMQTT,
     
     "TaskMQTT",
-    8192,
+    5120,
     nullptr,
     2,
     nullptr,
@@ -218,7 +240,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     taskWiFiMonitor,
     "TaskWiFiMonitor",
-    4096, // <-- INCREMENTADO PARA EVITAR STACK OVERFLOW
+    3072,
     nullptr,
     1,
     nullptr,
