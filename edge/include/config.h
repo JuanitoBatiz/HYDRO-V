@@ -22,11 +22,11 @@
 #define WIFI_PASSWORD           "FCP2430290431"
 
 #define MQTT_BROKER             "192.168.68.61"
-#define MQTT_PORT               8883
+#define MQTT_PORT               1883
 #define MQTT_USERNAME           "hydrov_esp32_01"
 #define MQTT_PASSWORD           "Emmamiamor1"
 #define MQTT_CLIENT_ID          "HYDRO-V-001"
-#define MQTT_USE_TLS            true
+#define MQTT_USE_TLS            false
 
 // MQTT Topics
 #define MQTT_TOPIC_TELEMETRY    "hydrov/HYDRO-V-001/telemetry"

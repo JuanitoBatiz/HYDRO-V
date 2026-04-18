@@ -143,15 +143,15 @@ void setup() {
   delay(2000);
 
   // --- PRUEBA VALVULA ---
-  pinMode(4, OUTPUT);
   Serial.println("[SISTEMA] CERRANDO VÁLVULA");
-  digitalWrite(4, LOW);
+  pinMode(4, OUTPUT_OPEN_DRAIN);
+  digitalWrite(4, HIGH);
   delay(4000);
   Serial.println("[SISTEMA] INTENTANDO ABRIR VÁLVULA");
-  digitalWrite(4, HIGH);
+  digitalWrite(4, LOW);
   delay(1000);
   Serial.println("[SISTEMA] CERRANDO VÁLVULA");
-  digitalWrite(4, LOW);
+  digitalWrite(4, HIGH);
   // --- PRUEBA VALVULA ---
   
   Serial.println("\n");
@@ -171,6 +171,12 @@ void setup() {
   // Inicializar máquina de estados (NUEVO)
   Serial.println("[Setup] Inicializando FSM...");
   initFSM();
+
+  // Prueba rápida de válvula antes de red/MQTT
+  openValveIntake();
+  delay(3000);
+  closeValveIntake();
+  Serial.println("[PRUEBA] Válvula probada con éxito.");
 
   // Configurar red WiFi + MQTT
   Serial.println("[Setup] Configurando red (WiFi/MQTT)...");
