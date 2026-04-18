@@ -149,8 +149,8 @@ float readFlowRate(unsigned long intervalMs) {
 
     // ── Sección crítica: leer y resetear pulsos de forma atómica ────────────
     noInterrupts();
-    uint16_t pulses     = currentFlowPulses;
-    currentFlowPulses   = 0;  // Solo los temporales; totalFlowPulses no se toca
+    uint16_t pulses   = currentFlowPulses;
+    currentFlowPulses = 0;  // Solo los temporales; totalFlowPulses no se toca
     interrupts();
 
     float liters  = (float)pulses / FLOW_PULSES_PER_LITER;

@@ -21,7 +21,7 @@
 #define WIFI_SSID               "FCP-1"
 #define WIFI_PASSWORD           "FCP2430290431"
 
-#define MQTT_BROKER             "56e39f9776c14953958f63d9c18ae8ef.s1.eu.hivemq.cloud"
+#define MQTT_BROKER             "192.168.68.61"
 #define MQTT_PORT               8883
 #define MQTT_USERNAME           "hydrov_esp32_01"
 #define MQTT_PASSWORD           "Emmamiamor1"
