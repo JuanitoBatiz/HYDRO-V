@@ -3,7 +3,7 @@ from .role import Role
 from .sensor_type import SensorType
 from .valve_type import ValveType
 from .alert_type import AlertType
-from .device import Device, DeviceEdge
+from .device import Device
 from .user import User
 from .sensor import Sensor
 from .valve import Valve

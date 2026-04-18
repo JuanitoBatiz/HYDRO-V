@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, String, Float, DateTime, ForeignKey, CheckConstraint, Boolean, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from datetime import datetime
 from sqlalchemy.sql import func
@@ -20,7 +20,13 @@ class Device(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     # Relaciones
-    telemetry_events:     Mapped[list["TelemetryEvent"]]     = relationship("TelemetryEvent",     back_populates="device")
-    emergency_alerts:     Mapped[list["EmergencyAlert"]]     = relationship("EmergencyAlert",     back_populates="device")
-    # autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship("AutonomyPrediction", back_populates="device")
-    # leak_detections:      Mapped[list["LeakDetection"]]      = relationship("LeakDetection",      back_populates="device")
+    # NOTA: TelemetryEvent no existe como modelo SQLAlchemy — la telemetría
+    # vive en InfluxDB, no en PostgreSQL. Se comenta para no romper el mapper.
+    # telemetry_events: Mapped[list["TelemetryEvent"]] = relationship("TelemetryEvent", back_populates="device")
+
+    # NOTA: EmergencyAlert tampoco existe — las alertas de emergencia se
+    # registran en la tabla 'alerts' a través del modelo Alert.
+    # emergency_alerts: Mapped[list["EmergencyAlert"]] = relationship("EmergencyAlert", back_populates="device")
+
+    # autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship(...)
+    # leak_detections:      Mapped[list["LeakDetection"]]      = relationship(...)

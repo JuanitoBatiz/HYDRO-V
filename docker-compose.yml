@@ -103,37 +103,39 @@ services:
     networks:
       - hydrov-net
 
-  # ── Frontend React/Vite ─────────────────────────────────────────
+  # ── Frontend React/Vite (Nginx SPA + reverse proxy a /api/) ───────
   frontend:
     build:
       context: ./hydrov-frontend
       dockerfile: ../infra/docker/frontend.Dockerfile
     container_name: hydrov-frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:8000
-      VITE_WS_URL: ws://localhost:8000
+    # NOTA: VITE_API_URL se lee en BUILD TIME desde hydrov-frontend/.env
+    # No se pasa como environment de runtime porque Vite ya la compiló.
     ports:
-      - "5173:5173"
+      - "80:80"   # ← Puerto estándar HTTP; accede desde el móvil con http://192.168.68.58
     depends_on:
       - backend
     networks:
       - hydrov-net
 
-  # ── Nginx reverse proxy ─────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: hydrov-nginx
-    restart: unless-stopped
-    volumes:
-      - ./infra/docker/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - hydrov-net
+  # ── Nginx reverse proxy (DESACTIVADO) ──────────────────────────
+  # El contenedor 'frontend' ya incluye Nginx con proxy inverso a /api/.
+  # Este servicio separado ya no es necesario en esta arquitectura.
+  # Si lo necesitas para otro propósito, descomenta el bloque:
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: hydrov-nginx
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./infra/docker/nginx.conf:/etc/nginx/nginx.conf:ro
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend
+  #     - frontend
+  #   networks:
+  #     - hydrov-net
 
   # ── Grafana ─────────────────────────────────────────────────────
   grafana:

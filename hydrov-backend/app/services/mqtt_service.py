@@ -159,7 +159,7 @@ async def mqtt_to_influx_loop(pg_pool: asyncpg.Pool) -> None:
                 username=settings.MQTT_USER,
                 password=settings.MQTT_PASSWORD,
                 tls_params=aiomqtt.TLSParameters(),
-                identifier=settings.MQTT_CLIENT_ID,
+                client_id=unique_client_id,   # aiomqtt >= 0.9: 'identifier' fue renombrado a 'client_id'
             ) as client:
                 await client.subscribe(settings.MQTT_TOPIC_TELEMETRY, qos=1)
                 logger.info(f"[MQTT] Conectado y suscrito a {settings.MQTT_TOPIC_TELEMETRY} con ID {unique_client_id}")
