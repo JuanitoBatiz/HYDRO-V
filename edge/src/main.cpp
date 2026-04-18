@@ -199,7 +199,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     taskWiFiMonitor,
     "TaskWiFiMonitor",
-    2048,
+    4096, // <-- INCREMENTADO PARA EVITAR STACK OVERFLOW
     nullptr,
     1,
     nullptr,
