@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -165,15 +165,20 @@ app = FastAPI(
 
 
 # ─────────────────────────────────────────────────────────────────
-#  CORS
+#  CORS Middleware Manual
 # ─────────────────────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.middleware('http')
+async def force_cors_headers(request: Request, call_next):
+    if request.method == 'OPTIONS':
+        response = Response()
+    else:
+        response = await call_next(request)
+    
+    response.headers['Access-Control-Allow-Origin'] = 'http://192.168.68.67:5173'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 
 # ─────────────────────────────────────────────────────────────────

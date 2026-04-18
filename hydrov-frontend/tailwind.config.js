@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  // Light mode by default — no 'dark' class needed
+  darkMode: 'class', // Enable class-based dark mode
   theme: {
     extend: {
       colors: {
@@ -16,6 +16,12 @@ export default {
         'brand-700': '#0558a0',
         'brand-800': '#094984',
         'brand-900': '#0d3e6d',
+
+        // Deep Ocean Dark Mode Colors
+        'ocean-900': '#040b16',
+        'ocean-800': '#0a1628',
+        'ocean-700': '#11223c',
+        'ocean-600': '#1a3258',
 
         // Semantic — accessible, soft
         'success-bg':  '#f0fdf4',
@@ -72,8 +78,10 @@ export default {
       },
       boxShadow: {
         'card':   '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)',
+        'card-dark': '0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2)',
         'card-lg':'0 2px 8px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.08)',
         'btn':    '0 2px 4px rgba(14,141,230,0.25), 0 4px 12px rgba(14,141,230,0.15)',
+        'btn-glow': '0 0 12px rgba(56, 170, 248, 0.6), 0 0 24px rgba(56, 170, 248, 0.4)',
         'btn-lg': '0 4px 8px rgba(14,141,230,0.3), 0 8px 20px rgba(14,141,230,0.2)',
         'focus':  '0 0 0 3px rgba(14,141,230,0.35)',
       },
@@ -84,6 +92,8 @@ export default {
         'slide-down': 'slideDown 0.35s ease-out forwards',
         'fade-in':    'fadeIn 0.4s ease-out forwards',
         'pulse-ring': 'pulseRing 2s ease-out infinite',
+        'gradient-pan': 'gradientPan 15s ease infinite',
+        'pulse-glow': 'pulseGlow 2.5s ease-in-out infinite',
       },
       keyframes: {
         rise: {
@@ -111,6 +121,15 @@ export default {
           '70%':  { transform: 'scale(1.6)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '0' },
         },
+        gradientPan: {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
+        pulseGlow: {
+          '0%, 100%': { boxShadow: '0 0 12px rgba(14, 141, 230, 0.4)' },
+          '50%': { boxShadow: '0 0 24px rgba(56, 170, 248, 0.8), 0 0 40px rgba(56, 170, 248, 0.4)' },
+        }
       },
     },
   },

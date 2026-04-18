@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",   # React dev
         "http://localhost:5173",   # Vite dev
+        "http://192.168.68.67",    # Local network testing
+        "http://192.168.68.67:5173", # Local network testing (Vite)
     ]
 
     # ── WebSockets ────────────────────────────────────────────────

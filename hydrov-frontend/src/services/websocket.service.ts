@@ -9,7 +9,7 @@ export class WebSocketService {
 
   constructor(deviceCode: string) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const host = (window.location.hostname === 'localhost' || window.location.hostname === '192.168.68.67') ? '192.168.68.67:8000' : window.location.host;
     this.url = `${protocol}//${host}/api/v1/telemetry/ws/${deviceCode}`;
   }
 

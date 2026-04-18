@@ -1,4 +1,5 @@
 import { Droplets, Wifi, WifiOff, Bell } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   isConnected: boolean;
@@ -23,7 +24,7 @@ export function Navbar({
     : null;
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-6 py-3 bg-white/90 backdrop-blur-sm border-b border-neutral-200 shadow-sm">
+    <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-6 py-3 bg-white/70 dark:bg-ocean-900/70 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shadow-sm transition-colors duration-500">
       {/* Left: brand (mobile only — sidebar handles desktop) */}
       <div className="flex items-center gap-2.5 md:hidden">
         <div
@@ -32,13 +33,13 @@ export function Navbar({
         >
           <Droplets className="w-5 h-5 text-white" aria-hidden="true" />
         </div>
-        <span className="text-lg font-black text-neutral-900">Hydro-V</span>
+        <span className="text-lg font-black text-neutral-900 dark:text-f1f5f9">Hydro-V</span>
       </div>
 
       {/* Desktop title — reflects current view */}
       <div className="hidden md:block">
-        <h1 className="text-xl font-bold text-neutral-900">{pageTitle}</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="text-xl font-bold text-neutral-900 dark:text-f1f5f9">{pageTitle}</h1>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
           {deviceCode}
           {timeStr && <> · Actualizado a las {timeStr}</>}
         </p>
@@ -50,8 +51,8 @@ export function Navbar({
         <div
           className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border"
           style={isConnected
-            ? { background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }
-            : { background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239' }}
+            ? { background: 'rgba(240,253,244,0.1)', borderColor: 'rgba(34,197,94,0.3)', color: '#22c55e' }
+            : { background: 'rgba(255,241,242,0.1)', borderColor: 'rgba(244,63,94,0.3)', color: '#f43f5e' }}
         >
           {isConnected
             ? <Wifi className="w-4 h-4" aria-hidden="true" />
@@ -66,10 +67,13 @@ export function Navbar({
           aria-label={isConnected ? 'Conectado' : 'Sin conexión'}
         />
 
+        {/* Dark Mode Toggle */}
+        <ThemeToggle />
+
         {/* Notifications bell — interactive */}
         <button
           onClick={onNotificationsClick}
-          className="relative p-2 rounded-xl transition-colors"
+          className="relative p-2 rounded-xl transition-colors hover:bg-neutral-100 dark:hover:bg-white/10"
           style={{
             background: 'none',
             border: 'none',
