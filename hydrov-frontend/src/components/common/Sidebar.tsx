@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Droplets, LayoutDashboard, BarChart3, Settings, Bell, LogOut, ChevronRight, BrainCircuit } from 'lucide-react';
 
 export type SectionId = 'dashboard' | 'history' | 'analytics' | 'settings';
@@ -23,6 +23,8 @@ interface SidebarProps {
   onLogout?: () => void;
   onNotificationsClick?: () => void;
   unreadCount?: number;
+  isOpen?: boolean;
+  onMenuClose?: () => void;
 }
 
 export function Sidebar({
@@ -32,12 +34,32 @@ export function Sidebar({
   onLogout,
   onNotificationsClick,
   unreadCount = 0,
+  isOpen = false,
+  onMenuClose,
 }: SidebarProps) {
+  // Mobile backdrop and hybrid side-panel
   return (
-    <aside
-      className="hidden md:flex flex-col w-72 min-h-screen shrink-0 bg-white/70 dark:bg-ocean-900/50 backdrop-blur-md border-r border-neutral-200 dark:border-white/10 shadow-sm transition-colors duration-500"
-      aria-label="Menú de navegación"
-    >
+    <>
+      {/* ── Backdrop oscuro (solo visible en móviles cuando isOpen = true) ── */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onMenuClose}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col w-72 h-[100dvh] shrink-0 bg-white/70 dark:bg-ocean-900/50 backdrop-blur-xl border-r border-neutral-200 dark:border-white/10 shadow-xl transition-transform duration-300 md:relative md:flex md:shadow-none ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+        aria-label="Menú de navegación"
+      >
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-neutral-200 dark:border-white/10">
         <div
@@ -82,7 +104,10 @@ export function Sidebar({
           return (
             <motion.button
               key={item.id}
-              onClick={() => onSectionChange?.(item.id)}
+                onClick={() => {
+                  onSectionChange?.(item.id);
+                  onMenuClose?.();
+                }}
               className={`nav-item w-full text-left ${isActive ? 'active dark-active' : ''} dark:text-neutral-300 dark:hover:bg-white/5 dark:hover:text-f1f5f9`}
               whileHover={{ x: 2 }}
               whileTap={{ scale: 0.98 }}
@@ -138,6 +163,7 @@ export function Sidebar({
           <span className="text-base font-semibold">Cerrar sesión</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

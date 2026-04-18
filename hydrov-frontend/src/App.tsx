@@ -270,6 +270,7 @@ function AppShell({ email: _email, deviceCode, onLogout }: AppShellProps) {
   const [notifOpen, setNotifOpen]               = useState(false);
   const [leakBannerVisible, setLeakBannerVisible] = useState(false);
   const [leakSeverity, setLeakSeverity]           = useState<'warning' | 'danger'>('warning');
+  const [isSidebarOpen, setIsSidebarOpen]         = useState(false);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -278,7 +279,7 @@ function AppShell({ email: _email, deviceCode, onLogout }: AppShellProps) {
       className="min-h-dvh flex"
       style={{ background: 'linear-gradient(160deg, #f0f7ff 0%, #f8fafc 60%, #fefefe 100%)' }}
     >
-      {/* Desktop sidebar */}
+      {/* Desktop & Mobile Slide-over sidebar */}
       <Sidebar
         activeSection={section}
         onSectionChange={setSection}
@@ -286,10 +287,12 @@ function AppShell({ email: _email, deviceCode, onLogout }: AppShellProps) {
         onLogout={onLogout}
         onNotificationsClick={() => setNotifOpen(true)}
         unreadCount={UNREAD_COUNT}
+        isOpen={isSidebarOpen}
+        onMenuClose={() => setIsSidebarOpen(false)}
       />
 
       {/* Main content column */}
-      <div className="flex-1 flex flex-col min-h-dvh overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-dvh overflow-hidden w-full relative">
         <Navbar
           isConnected={isConnected}
           deviceCode={deviceCode}
@@ -297,6 +300,7 @@ function AppShell({ email: _email, deviceCode, onLogout }: AppShellProps) {
           pageTitle={PAGE_TITLES[section]}
           unreadCount={UNREAD_COUNT}
           onNotificationsClick={() => setNotifOpen(true)}
+          onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
         />
 
         {/* Animated view switcher */}

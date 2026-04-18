@@ -1,4 +1,4 @@
-import { Droplets, Wifi, WifiOff, Bell } from 'lucide-react';
+import { Droplets, Wifi, WifiOff, Bell, Menu } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
@@ -9,6 +9,7 @@ interface NavbarProps {
   /** Number of unread notifications — shows red dot when > 0 */
   unreadCount?: number;
   onNotificationsClick?: () => void;
+  onMenuClick?: () => void;
 }
 
 export function Navbar({
@@ -18,6 +19,7 @@ export function Navbar({
   pageTitle = 'Mi Panel de Agua',
   unreadCount = 0,
   onNotificationsClick,
+  onMenuClick,
 }: NavbarProps) {
   const timeStr = lastUpdate
     ? lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -25,14 +27,15 @@ export function Navbar({
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-6 py-3 bg-white/70 dark:bg-ocean-900/70 backdrop-blur-md border-b border-neutral-200 dark:border-white/10 shadow-sm transition-colors duration-500">
-      {/* Left: brand (mobile only — sidebar handles desktop) */}
-      <div className="flex items-center gap-2.5 md:hidden">
-        <div
-          className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0"
-          style={{ background: '#0e8de6' }}
+      {/* Left: Hamburger menu (mobile only) */}
+      <div className="flex items-center gap-2.5">
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 -ml-2 rounded-xl text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-ocean-800 transition-colors"
+          aria-label="Abrir menú de navegación"
         >
-          <Droplets className="w-5 h-5 text-white" aria-hidden="true" />
-        </div>
+          <Menu className="w-6 h-6" />
+        </button>
         <span className="text-lg font-black text-neutral-900 dark:text-f1f5f9">Hydro-V</span>
       </div>
 
