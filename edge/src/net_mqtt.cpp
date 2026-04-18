@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <ArduinoJson.h>
@@ -12,7 +11,7 @@
 #include "fsm_logic.h"
 
 namespace {
-WiFiClientSecure espClient;
+WiFiClient espClient;
 volatile bool wifiConnected = false;
 volatile bool mqttConnected = false;
 
@@ -127,9 +126,6 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 void initNetwork() {
 	setupWiFi();
 
-	if (MQTT_USE_TLS) {
-		espClient.setInsecure();
-	}
 	mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
 	mqttClient.setCallback(onMqttMessage);
 	mqttClient.setBufferSize(512);
