@@ -19,16 +19,8 @@ class Device(Base):
     installed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
-class DeviceEdge(Base):
-    __tablename__ = "device_edges"
-    __table_args__ = (
-        CheckConstraint("source_device_id <> target_device_id", name="chk_no_self_edge"),
-        UniqueConstraint("source_device_id", "target_device_id", name="idx_device_edges_unique")
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), nullable=False)
-    target_device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), nullable=False)
-    is_bidirectional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    pipe_diameter_mm: Mapped[float | None] = mapped_column(Float, CheckConstraint("pipe_diameter_mm > 0", name="chk_device_ac1521"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Relaciones
+    telemetry_events:     Mapped[list["TelemetryEvent"]]     = relationship("TelemetryEvent",     back_populates="device")
+    emergency_alerts:     Mapped[list["EmergencyAlert"]]     = relationship("EmergencyAlert",     back_populates="device")
+    # autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship("AutonomyPrediction", back_populates="device")
+    # leak_detections:      Mapped[list["LeakDetection"]]      = relationship("LeakDetection",      back_populates="device")

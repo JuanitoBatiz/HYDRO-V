@@ -1,4 +1,4 @@
-from .gnn_leak_detection import HydroGNN
+# from .gnn_leak_detection import HydroGNN
 from .gan_synthetic import Generator, Discriminator
 from .linear_autonomy import AutonomyPredictor
 

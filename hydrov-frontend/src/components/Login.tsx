@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Droplets, Smartphone, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Droplets, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (email: string, deviceCode: string) => void;
@@ -8,51 +8,72 @@ interface LoginProps {
 
 export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
-  const [deviceCode, setDeviceCode] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function handleDeviceCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // Auto-uppercase and format as HYDRO-V-XXXX-000
-    const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    setDeviceCode(raw);
-  }
-
-  // Static codes removed for backend validation
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    // Validate input fields are not empty
-    if (!email.includes('@') || !email.includes('.') || !password) {
-      setError('Por favor proporcione credenciales válidas y contraseña.');
+    // Validar correo
+    if (!email.includes('@') || !email.includes('.')) {
+      setError('Por favor escribe un correo electrónico válido.');
       return;
     }
 
-    if (!deviceCode.trim()) {
-      setError('Se requiere código de dispositivo para inicializar telemetría.');
+    // Validar contraseña vacía
+    if (!password) {
+      setError('Por favor ingresa tu contraseña.');
       return;
     }
 
     setLoading(true);
+    
     try {
-      const response = await fetch('http://192.168.68.67:8000/api/v1/auth/login', {
+      // El backend de Hydro-V espera un JSON con 'email' y 'password' 
+      // basado en el UserLoginSchema, en lugar de un OAuth2PasswordRequestForm.
+      const payload = {
+        email: email,
+        password: password,
+      };
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        const { access_token } = await response.json();
-        localStorage.setItem('hydrov_token', access_token);
-        onLogin(email, deviceCode.trim().toUpperCase());
-      } else {
-        setError('Credenciales incorrectas o usuario no encontrado');
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Manejo seguro de errores para evitar que React explote con objetos (Ej. Error 422 Pydantic)
+        let errorMsg = 'Credenciales inválidas. Verifica tu correo y contraseña.';
+        if (data.detail) {
+          if (typeof data.detail === 'string') {
+            errorMsg = data.detail;
+          } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+            errorMsg = data.detail[0].msg || errorMsg;
+          }
+        }
+        setError(errorMsg);
+        setLoading(false);
+        return;
       }
+
+      // Guardar token JWT en memoria del navegador
+      localStorage.setItem('hydrov_access_token', data.access_token);
+      
+      setLoading(false);
+      // Hardcodeamos el device ID para el Dashboard temporalmente
+      onLogin(email, 'HYDRO-V-NEZA-001');
+
     } catch (err) {
-      setError('Problema de red. El backend podría estar caído.');
-    } finally {
+      console.error(err);
+      setError('Error de conexión con el servidor. Intenta de nuevo más tarde.');
       setLoading(false);
     }
   }
@@ -93,9 +114,9 @@ export function Login({ onLogin }: LoginProps) {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-50 border-2 border-brand-100 mb-4">
                 <ShieldCheck className="w-8 h-8 text-brand-500" />
               </div>
-              <h2 className="text-2xl font-bold text-neutral-900">Vincular tu dispositivo</h2>
+              <h2 className="text-2xl font-bold text-neutral-900">Bienvenido de vuelta</h2>
               <p className="text-base text-neutral-500 mt-2 leading-relaxed">
-                Conecta tu sistema Hydro-V para empezar a monitorear el agua de tu hogar.
+                Ingresa tus credenciales para acceder a tu panel de control Hydro-V.
               </p>
             </div>
 
@@ -157,30 +178,23 @@ export function Login({ onLogin }: LoginProps) {
                 </div>
               </div>
 
-              {/* Device code */}
+              {/* Password */}
               <div className="space-y-2">
-                <label htmlFor="login-device" className="block text-base font-semibold text-neutral-800">
-                  Código de tu dispositivo
+                <label htmlFor="login-password" className="block text-base font-semibold text-neutral-800">
+                  Contraseña
                 </label>
                 <div className="relative">
-                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
                   <input
-                    id="login-device"
-                    type="text"
-                    inputMode="text"
-                    autoCapitalize="characters"
-                    autoComplete="off"
+                    id="login-password"
+                    type="password"
                     required
-                    placeholder="HYDRO-V-NEZA-001"
-                    value={deviceCode}
-                    onChange={handleDeviceCodeChange}
-                    className="input-field pl-12 font-mono tracking-wider"
-                    aria-describedby="device-hint"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-12 tracking-wide"
                   />
                 </div>
-                <p id="device-hint" className="text-sm text-neutral-500">
-                  Encuéntralo en la etiqueta de tu caja o en la parte trasera del sensor.
-                </p>
               </div>
 
               {/* Submit */}
@@ -197,7 +211,7 @@ export function Login({ onLogin }: LoginProps) {
                   </>
                 ) : (
                   <>
-                    Vincular y Entrar
+                    Entrar al panel
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -207,9 +221,9 @@ export function Login({ onLogin }: LoginProps) {
             {/* Help text */}
             <div className="mt-6 pt-6 border-t border-neutral-200 text-center">
               <p className="text-sm text-neutral-500">
-                ¿No tienes tu código?{' '}
+                ¿Olvidaste tu contraseña?{' '}
                 <button className="text-brand-600 font-semibold underline underline-offset-2 hover:text-brand-700">
-                  Consulta el manual de tu kit
+                  Recuperar acceso
                 </button>
               </p>
             </div>
