@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Droplets, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Droplets, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Cpu } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (email: string, deviceCode: string) => void;
@@ -9,6 +9,7 @@ interface LoginProps {
 export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [deviceCode, setDeviceCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,6 +26,12 @@ export function Login({ onLogin }: LoginProps) {
     // Validar contraseña vacía
     if (!password) {
       setError('Por favor ingresa tu contraseña.');
+      return;
+    }
+
+    // Validar código de dispositivo
+    if (!deviceCode.trim()) {
+      setError('Por favor ingresa el código de tu dispositivo.');
       return;
     }
 
@@ -47,12 +54,21 @@ export function Login({ onLogin }: LoginProps) {
         body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
+      // Guardamos el JSON de forma segura: si el servidor devuelve HTML (ej. 502 de Nginx)
+      // response.json() lanzaría SyntaxError. Lo atrapamos aquí con gracia.
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        setError('Error de conexión con el servidor. Inténtalo de nuevo más tarde.');
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         // Manejo seguro de errores para evitar que React explote con objetos (Ej. Error 422 Pydantic)
         let errorMsg = 'Credenciales inválidas. Verifica tu correo y contraseña.';
-        if (data.detail) {
+        if (data?.detail) {
           if (typeof data.detail === 'string') {
             errorMsg = data.detail;
           } else if (Array.isArray(data.detail) && data.detail.length > 0) {
@@ -68,8 +84,8 @@ export function Login({ onLogin }: LoginProps) {
       localStorage.setItem('hydrov_access_token', data.access_token);
       
       setLoading(false);
-      // Hardcodeamos el device ID para el Dashboard temporalmente
-      onLogin(email, 'HYDRO-V-NEZA-001');
+      // Usamos el código ingresado por el usuario; si está vacío usamos el default
+      onLogin(email, deviceCode.trim() || 'HYDRO-V-NEZA-001');
 
     } catch (err) {
       console.error(err);
@@ -178,23 +194,30 @@ export function Login({ onLogin }: LoginProps) {
                 </div>
               </div>
 
-              {/* Password */}
+              {/* Código del dispositivo */}
               <div className="space-y-2">
-                <label htmlFor="login-password" className="block text-base font-semibold text-neutral-800">
-                  Contraseña
+                <label htmlFor="login-device-code" className="block text-base font-semibold text-neutral-800">
+                  Código del dispositivo
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
+                  <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
                   <input
-                    id="login-password"
-                    type="password"
+                    id="login-device-code"
+                    name="deviceCode"
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="characters"
                     required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pl-12 tracking-wide"
+                    placeholder="HYDRO-V-NEZA-001"
+                    value={deviceCode}
+                    onChange={(e) => setDeviceCode(e.target.value.toUpperCase())}
+                    className="input-field pl-12 font-mono tracking-widest"
+                    aria-describedby="device-code-hint"
                   />
                 </div>
+                <p id="device-code-hint" className="text-xs text-neutral-400">
+                  Encuéntralo en la etiqueta de tu dispositivo Hydro-V.
+                </p>
               </div>
 
               {/* Submit */}
@@ -207,7 +230,7 @@ export function Login({ onLogin }: LoginProps) {
                 {loading ? (
                   <>
                     <PairingSpinner />
-                    Vinculando dispositivo…
+                    Iniciando sesión…
                   </>
                 ) : (
                   <>

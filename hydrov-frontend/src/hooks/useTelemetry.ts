@@ -2,10 +2,19 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import mqtt from 'mqtt';
 import type { TelemetryPayload, TelemetryHistory, HistoricalDataPoint } from '@/types/telemetry.types';
 
-const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL || 'wss://localhost:8884/mqtt';
-const MQTT_USER  = import.meta.env.VITE_MQTT_USER || '';
-const MQTT_PASS  = import.meta.env.VITE_MQTT_PASS || '';
-const TOPIC = import.meta.env.VITE_MQTT_TOPIC || 'hydrov/+/telemetry';
+// Todas las vars deben estar en hydrov-frontend/.env con prefijo VITE_
+// Si alguna falta, se lanzará un error visible en consola durante el build.
+const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL;
+const MQTT_USER  = import.meta.env.VITE_MQTT_USER  || '';
+const MQTT_PASS  = import.meta.env.VITE_MQTT_PASS  || '';
+const TOPIC      = import.meta.env.VITE_MQTT_TOPIC || 'hydrov/+/telemetry';
+
+if (!BROKER_URL) {
+  console.error(
+    '❌ [useTelemetry] VITE_MQTT_BROKER_URL no está definida.\n' +
+    'Agrega la variable a hydrov-frontend/.env y reconstruye la imagen Docker.'
+  );
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -41,7 +50,8 @@ export function useHydroData(): UseHydroDataReturn {
       username: MQTT_USER,
       password: MQTT_PASS,
       clientId: 'hydrov-web-' + Math.random().toString(16).substring(2, 8),
-      protocol: 'wss',
+      // NOTA: No poner `protocol: 'wss'` aquí — ya está codificado en BROKER_URL (wss://...).
+      // Repetirlo provoca un conflicto interno en mqtt.js.
       reconnectPeriod: 5000,
       connectTimeout: 30 * 1000,
     };
@@ -65,7 +75,13 @@ export function useHydroData(): UseHydroDataReturn {
     });
 
     client.on('message', (topic, message) => {
-      if (topic === TOPIC) {
+      // El broker entrega el topic real (ej. "hydrov/HYDRO-V-001/telemetry").
+      // No podemos comparar con igualdad estricta porque TOPIC tiene wildcard (+).
+      // Convertimos el patrón a regex: hydrov/+/telemetry → hydrov/[^/]+/telemetry
+      const topicRegex = new RegExp(
+        '^' + TOPIC.replace(/\+/g, '[^/]+').replace(/#/g, '.+') + '$'
+      );
+      if (topicRegex.test(topic)) {
         try {
           const raw = JSON.parse(message.toString());
           
