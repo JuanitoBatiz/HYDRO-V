@@ -13,7 +13,7 @@
 // PIN DEFINITIONS - ACTUATORS (VALVES)
 // ============================================
 #define PIN_VALVE_REJECT        26  // Válvula de rechazo (normalmente cerrada)
-#define PIN_VALVE_INTAKE        14  // Válvula de admisión (normalmente abierta)
+#define PIN_VALVE_INTAKE        4   // Válvula de admisión (normalmente abierta)
 
 // ============================================
 // WIFI & MQTT CONFIGURATION - HiveMQ Cloud
@@ -21,16 +21,24 @@
 #define WIFI_SSID               "FCP-1"
 #define WIFI_PASSWORD           "FCP2430290431"
 
-#define MQTT_BROKER             "192.168.68.61"
-#define MQTT_PORT               1883
+#define MQTT_BROKER             "56e39f9776c14953958f63d9c18ae8ef.s1.eu.hivemq.cloud"
+#define MQTT_PORT               8883
 #define MQTT_USERNAME           "hydrov_esp32_01"
 #define MQTT_PASSWORD           "Emmamiamor1"
-#define MQTT_CLIENT_ID          "HYDRO-V-001"
-#define MQTT_USE_TLS            false
+#define MQTT_CLIENT_ID          "HYDRO-V-NEZA-001"
+#define MQTT_USE_TLS            true
 
 // MQTT Topics
-#define MQTT_TOPIC_TELEMETRY    "hydrov/HYDRO-V-001/telemetry"
-#define MQTT_TOPIC_COMMANDS     "hydrov/HYDRO-V-001/commands"
+#define MQTT_TOPIC_TELEMETRY    "hydrov/HYDRO-V-NEZA-001/telemetry"
+#define MQTT_TOPIC_COMMANDS     "hydrov/HYDRO-V-NEZA-001/commands"
+
+// ============================================
+// NTP CONFIGURATION
+// ============================================
+#define NTP_TIME_OFFSET_SECONDS (-6 * 3600)
+#define NTP_SERVER_PRIMARY      "pool.ntp.org"
+#define NTP_SERVER_SECONDARY    "time.google.com"
+#define NTP_SERVER_TERTIARY     "time.windows.com"
 
 // ============================================
 // SENSOR CALIBRATION CONSTANTS
