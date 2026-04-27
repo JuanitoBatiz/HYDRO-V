@@ -99,6 +99,7 @@ async def process_message(
         payload = ESP32PayloadSchema(**raw)
 
         device_code = payload.device_code
+        logger.info(f"[MQTT] Telemetría recibida | nodo: {device_code} | estado: {payload.system_state.state}")
 
         # --- Cálculo de nivel de Cisterna para Redis (G-07) ---
         meta = await device_cache.get_device_metadata(device_code)

@@ -245,9 +245,10 @@ Interfaz React/TypeScript con paneles de: nivel de cisterna, turbidez en vivo, h
 | **Frontend** | Framer Motion | 11.0 | Animaciones de UI |
 | **Frontend** | Tailwind CSS | 3.4 | Estilos utility-first |
 | **Infra** | Docker Compose | latest | Orquestación de servicios |
-| **Infra** | Nginx | Alpine | Reverse proxy |
+| **Infra** | Nginx | Alpine | Reverse proxy + SPA server (integrado en frontend container) |
 | **Infra** | Grafana | 10.4.0 | Dashboard técnico de monitoreo |
 | **Broker** | HiveMQ Cloud | TLS 8883 | Broker MQTT en la nube |
+| **Seguridad** | bcrypt | 3.1.7 (pinned) | Hashing de contraseñas (compatibilidad passlib) |
 
 ---
 
@@ -270,11 +271,13 @@ HYDRO-V/
 │       └── storage_fs.cpp            # Sistema de archivos para persistencia offline
 │
 ├── 📁 hydrov-backend/                # Backend Python / FastAPI
-│   ├── requirements.txt              # Dependencias del proyecto
+│   ├── requirements.txt              # Dependencias principales
+│   ├── requirements-dev.txt          # Dependencias de desarrollo y testing
+│   ├── requirements-extra.txt        # Extras opcionales (ML pesado)
 │   ├── alembic.ini                   # Configuración de migraciones DB
 │   ├── alembic/                      # Scripts de migración de PostgreSQL
 │   ├── app/
-│   │   ├── main.py                   # Startup, lifespan, router global, health check
+│   │   ├── main.py                   # Startup, lifespan, CORS manual, health check
 │   │   ├── config.py                 # Pydantic Settings (variables de entorno)
 │   │   ├── api/v1/
 │   │   │   ├── router.py             # Agrupación de todos los sub-routers
@@ -289,53 +292,94 @@ HYDRO-V/
 │   │   ├── core/
 │   │   │   ├── security.py           # JWT (HS256), bcrypt, OAuth2
 │   │   │   └── logger.py             # Logger estructurado
-│   │   ├── models/                   # ORM SQLAlchemy
+│   │   ├── models/                   # ORM SQLAlchemy (12 modelos)
 │   │   │   ├── device.py             # Nodo IoT (device_code, lat, lon, zonas)
 │   │   │   ├── zone.py               # Zona geográfica / colonia
 │   │   │   ├── alert.py              # Alertas generadas por la FSM o el ML
 │   │   │   ├── alert_type.py         # Catálogo de tipos de alertas
 │   │   │   ├── sensor.py             # Catálogo de sensores por dispositivo
+│   │   │   ├── sensor_type.py        # Catálogo de tipos de sensor ← nuevo
 │   │   │   ├── user.py               # Usuarios del dashboard
+│   │   │   ├── role.py               # Roles de usuario (RBAC) ← nuevo
 │   │   │   ├── valve.py              # Estado de válvulas registrado
+│   │   │   ├── valve_type.py         # Catálogo de tipos de válvula ← nuevo
 │   │   │   └── audit_log.py          # Log de auditoría de comandos
 │   │   ├── services/
-│   │   │   ├── mqtt_service.py       # Listener MQTT → InfluxDB pipeline
-│   │   │   ├── influx_service.py     # Lectura/escritura de InfluxDB
-│   │   │   ├── redis_service.py      # Caché Redis (último estado del nodo)
-│   │   │   ├── ml_service.py         # Inferencia: autonomía (sklearn) + fugas (GNN)
-│   │   │   ├── nasa_service.py       # Cliente NASA POWER
-│   │   │   ├── nasa_ingestion.py     # Ingesta periódica (APScheduler)
+│   │   │   ├── mqtt_service.py       # Listener aiomqtt → InfluxDB + PG + Redis
+│   │   │   ├── influx_service.py     # Lectura/escritura InfluxDB (2 measurements)
+│   │   │   ├── redis_service.py      # Caché Redis (estado nodo, throttle 60s)
+│   │   │   ├── ml_service.py         # Puente backend ↔ hydrov-ml (autonomía + fugas)
+│   │   │   ├── nasa_service.py       # Cliente NASA POWER API
+│   │   │   ├── nasa_ingestion.py     # Ingesta periódica (APScheduler 3 jobs)
 │   │   │   ├── nasa_parser.py        # Parseo de respuestas NASA
 │   │   │   ├── websocketservice.py   # Broadcast WebSocket al frontend
 │   │   │   └── device_cache.py       # Caché de metadatos de dispositivos
-│   │   ├── schemas/                  # Pydantic schemas (validación I/O REST)
+│   │   ├── schemas/                  # Pydantic v2 schemas (validación I/O REST)
+│   │   │   ├── mqtt.py               # ESP32PayloadSchema, SensorsSchema, SystemStateSchema
+│   │   │   ├── telemetry.py          # TelemetryResponseSchema, TelemetryListSchema
+│   │   │   ├── alert.py              # AlertResponseSchema, AlertListSchema
+│   │   │   ├── device.py             # DeviceCreateSchema, DeviceResponseSchema
+│   │   │   ├── prediction.py         # AutonomyResponseSchema, LeakResponseSchema
+│   │   │   └── user.py               # UserCreateSchema, TokenSchema
 │   │   ├── db/
 │   │   │   ├── init_db.py            # Inicialización de tablas
 │   │   │   └── influx_client.py      # Singleton async InfluxDB client
 │   │   └── seed.py                   # Datos iniciales de catálogos (v2.0)
-│   └── tests/                        # Pruebas unitarias e integración
+│   ├── scripts/
+│   │   └── deploy.sh                 # Script de despliegue automatizado
+│   └── tests/                        # Suite de pruebas pytest
+│       ├── conftest.py               # Fixtures globales (DB, auth, mocks)
+│       ├── tests_api/
+│       │   └── test_alerts.py        # Tests de endpoint /alerts
+│       └── tests_services/
+│           ├── test_influx_service.py
+│           ├── test_ml_service.py
+│           ├── test_mqtt_service.py
+│           ├── test_nasa_service.py
+│           └── test_websocket_service.py
 │
 ├── 📁 hydrov-frontend/               # Frontend React + TypeScript + Vite
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tailwind.config.js
+│   ├── default.conf                  # Nginx config integrada (SPA + proxy /api/)
 │   └── src/
-│       ├── App.tsx                   # Router principal, layout, auth guard
-│       ├── pages/                    # Páginas de la SPA
+│       ├── App.tsx                   # Shell principal: auth guard + SPA routing
+│       ├── pages/                    # Rutas de alto nivel
 │       │   ├── DashboardPage.tsx     # Panel principal con telemetría en vivo
 │       │   ├── AlertsPage.tsx        # Historial de alertas
 │       │   ├── ControlPage.tsx       # Control remoto de válvulas
 │       │   ├── HistoryPage.tsx       # Histórico de datos (gráficas)
 │       │   ├── SettingsPage.tsx      # Configuración del sistema
 │       │   └── LoginPage.tsx         # Autenticación JWT
+│       ├── views/                    # Sub-vistas del AppShell (sin re-render de layout)
+│       │   ├── HistoryView.tsx       # Gráficas históricas
+│       │   ├── AnalyticsView.tsx     # Inteligencia hídrica (ML insights)
+│       │   └── SettingsView.tsx      # Ajustes del sistema
 │       ├── components/               # Componentes reutilizables
-│       │   ├── dashboard/            # Widgets: nivel, turbidez, flujo, FSM state
+│       │   ├── Login.tsx             # Componente de autenticación con device code
+│       │   ├── dashboard/            # Widgets del panel principal
+│       │   │   ├── WaterLevelGauge.tsx
+│       │   │   ├── AutonomyCard.tsx
+│       │   │   ├── RainPredictorWidget.tsx
+│       │   │   ├── ClimatologyChart.tsx
+│       │   │   ├── WeatherWidget.tsx
+│       │   │   ├── LocationWidget.tsx
+│       │   │   ├── TurbidityChart.tsx
+│       │   │   ├── FlowRateChart.tsx
+│       │   │   └── LeakAlertBanner.tsx
 │       │   ├── control/              # Botones de comando remoto
 │       │   ├── maps/                 # Visualización de nodos en mapa
-│       │   └── common/               # Navbar, sidebar, alertas
+│       │   └── common/               # Navbar, Sidebar (hamburger), NotificationsPanel
 │       ├── services/                 # Clientes HTTP y WebSocket
-│       ├── store/                    # Estado global (React Context / Zustand)
-│       ├── hooks/                    # Custom hooks (useMQTT, useDevices, etc.)
+│       ├── store/                    # Estado global
+│       ├── hooks/
+│       │   ├── useTelemetry.ts       # useHydroData: polling + WebSocket
+│       │   ├── useAuth.ts
+│       │   ├── useDeviceControl.ts
+│       │   └── useWebSocket.ts
+│       ├── styles/
+│       │   └── global.css            # Estilos globales + tokens de diseño
 │       ├── types/                    # Interfaces TypeScript
 │       └── utils/                    # Helpers y formateadores
 │
@@ -439,17 +483,33 @@ GET    /health                         → Health check del sistema
 
 ### 3. Frontend — React/Vite
 
-SPA (Single Page Application) con TypeScript y Tailwind CSS.
+SPA (Single Page Application) con TypeScript y Tailwind CSS. La navegación principal se gestiona en `App.tsx` mediante un `AppShell` con `Sidebar` + `Navbar` responsivos (hamburger menu en móvil) y `AnimatePresence` de Framer Motion para transiciones suaves entre vistas.
 
-**Páginas:**
-| Página | Descripción |
-|--------|-------------|
-| `DashboardPage` | Telemetría en vivo: nivel, turbidez, caudal, estado FSM |
-| `ControlPage` | Comandos remotos: FORCE_HARVEST, FORCE_IDLE, RESET_ERRORS, REBOOT |
-| `AlertsPage` | Historial de alertas con filtros por tipo y severidad |
-| `HistoryPage` | Gráficas históricas de turbidez y nivel (Recharts) |
-| `SettingsPage` | Configuración de umbrales y preferencias |
-| `LoginPage` | Autenticación con JWT |
+**Vistas del AppShell:**
+| Vista / Sección | Descripción |
+|-----------------|-------------|
+| `dashboard` | Telemetría en vivo: `WaterLevelGauge`, `AutonomyCard`, `RainPredictorWidget`, stats rápidas |
+| `history` → `HistoryView` | Gráficas históricas de turbidez, nivel y caudal (Recharts) |
+| `analytics` → `AnalyticsView` | Inteligencia hídrica: climatología, predicciones ML, mapa de nodos |
+| `settings` → `SettingsView` | Configuración de umbrales, preferencias y control remoto |
+
+**Componentes del Dashboard:**
+| Componente | Función |
+|------------|--------|
+| `WaterLevelGauge` | Gauge animado del nivel de cisterna (%) |
+| `AutonomyCard` | Días de autonomía hídrica predichos por ML |
+| `RainPredictorWidget` | Pronóstico de precipitaciones NASA + gráfica |
+| `ClimatologyChart` | Histórico climatológico (temperatura, humedad) |
+| `WeatherWidget` | Estado climático actual integrado NASA POWER |
+| `LocationWidget` | Mapa de ubicación del nodo activo |
+| `TurbidityChart` | Gráfica de turbidez en tiempo real |
+| `FlowRateChart` | Gráfica de caudal (L/min) |
+| `LeakAlertBanner` | Banner de alerta de fuga (warning / danger) |
+
+**Common:**
+- `Sidebar` — Navegación lateral con collapse en desktop y drawer en móvil
+- `Navbar` — Barra superior con estado de conexión, badge de notificaciones y menú hamburger
+- `NotificationsPanel` — Panel slide-over de notificaciones
 
 ### 4. ML — Modelos de IA
 
@@ -469,25 +529,27 @@ MLP de 3 capas para cuando el grafo completo no está disponible. Retorna probab
 
 #### `AutonomyPredictor` — Predicción de Autonomía
 Regresión lineal múltiple (con StandardScaler) entrenada con:
-- `nivel_actual_litros`, `consumo_7d_lpm`, `consumo_30d_lpm`
-- `precipitacion_mm` (NASA POWER), `dia_semana`, `mes`
+- `nivel_actual_litros`, `consumo_7d_lpm` (desde InfluxDB últimos 7 días)
+- `forecast_precip_mm` (NASA POWER próximas 72h), `temperatura_c`, `humedad_pct`
+- `days_without_rain` (calculado desde InfluxDB), `mes`
 
-Modo fallback físico disponible si no hay modelo entrenado.
+El pipeline de inferencia vive en `hydrov-ml/src/inference/predict_autonomy.py`. Modo fallback físico disponible si no hay modelo entrenado.
 
 ### 5. Infraestructura
 
-El sistema se despliega completo con `docker-compose up` levantando 7 servicios:
+El sistema se despliega completo con `docker-compose up` levantando **6 servicios** (Nginx ya no es un servicio separado — está integrado en el container del frontend):
 
 ```yaml
 services:
-  postgres    # Catálogos y alertas
-  influxdb    # Telemetría de series temporales
-  redis       # Caché de estado (TTL 60s)
-  backend     # FastAPI (8000)
-  frontend    # React/Vite (5173)
-  nginx       # Reverse proxy (80)
-  grafana     # Dashboard técnico (3000)
+  postgres    # Catálogos y alertas (PostgreSQL 15)
+  influxdb    # Telemetría de series temporales (InfluxDB 2.7)
+  redis       # Caché de estado (TTL 60s, maxmemory 256mb LRU)
+  backend     # FastAPI (puerto 8000)
+  frontend    # React/Vite + Nginx integrado (puerto 80)
+  grafana     # Dashboard técnico (puerto 3000)
 ```
+
+> **Nota:** El container `frontend` sirve la SPA compilada **y** hace proxy inverso de `/api/` → backend. El servicio `nginx` independiente está desactivado en `docker-compose.yml`.
 
 ---
 
@@ -570,11 +632,12 @@ docker compose logs -f backend
 **URLs de acceso:**
 | Servicio | URL | Descripción |
 |----------|-----|-------------|
-| Dashboard | http://localhost:5173 | Interfaz principal |
-| API REST | http://localhost:8000/docs | Swagger UI (solo dev) |
-| Grafana | http://localhost:3000 | Dashboard técnico |
+| Dashboard | http://localhost | Interfaz principal (puerto 80, Nginx integrado) |
+| Dashboard (red local) | http://\<IP-LAN\> | Acceso desde móvil en la misma red |
+| API REST | http://localhost:8000/docs | Swagger UI (solo cuando `DEBUG=true`) |
+| Grafana | http://localhost:3000 | Dashboard técnico de monitoreo |
 | InfluxDB | http://localhost:8086 | Administración de datos |
-| API v1 Health | http://localhost:8000/api/v1/health | Estado de servicios |
+| Health | http://localhost:8000/health | Estado de servicios |
 
 ### Desarrollo Local
 
@@ -585,14 +648,26 @@ python -m venv .venv
 .venv\Scripts\activate         # Windows
 source .venv/bin/activate       # Linux/macOS
 pip install -r requirements.txt
+pip install -r requirements-dev.txt  # Dependencias de testing
 uvicorn app.main:app --reload --port 8000
+```
+
+**Ejecutar tests:**
+```bash
+cd hydrov-backend
+pytest tests/ -v
+
+# Tests por módulo
+pytest tests/tests_services/test_mqtt_service.py -v
+pytest tests/tests_services/test_ml_service.py -v
+pytest tests/tests_api/test_alerts.py -v
 ```
 
 **Frontend:**
 ```bash
 cd hydrov-frontend
 npm install
-npm run dev
+npm run dev   # Puerto 5173 (desarrollo)
 ```
 
 **Modelos ML:**
@@ -603,9 +678,9 @@ pip install -r requirements.txt
 # Entrenar modelo de autonomía
 python src/training/train_autonomy.py
 
-# Probar modelos rápidamente
-python src/models/gnn_leak_detection.py
-python src/models/linear_autonomy.py
+# Probar pipeline de inferencia directamente
+python src/inference/predict_autonomy.py
+python src/inference/detect_leaks.py
 ```
 
 ### Flasheo del Firmware ESP32
@@ -746,6 +821,8 @@ GET /health
 }
 ```
 
+> `status` es `"ok"` si PostgreSQL e InfluxDB están disponibles; `"degraded"` en caso contrario. El campo `mqtt` verifica que el asyncio Task del listener esté activo; `scheduler` que el APScheduler esté corriendo.
+
 ---
 
 ## 🧮 Algoritmos Core
@@ -819,11 +896,19 @@ SYSTEM_IDLE ⟷ WATER_REJECT ⟷ WATER_INTAKE
 
 ### Predicción de Autonomía Hídrica
 
-Modelo de **regresión lineal múltiple** (scikit-learn) con normalización StandardScaler:
+Modelo de **regresión lineal múltiple** (scikit-learn) con normalización StandardScaler. El pipeline completo (`hydrov-ml/src/inference/predict_autonomy.py`) integra tres fuentes de datos en tiempo real:
 
 ```python
-Y_pred = β₀ + β₁(nivel_litros) + β₂(consumo_7d) + β₃(consumo_30d)
-             + β₄(precipitacion_mm) + β₅(dia_semana) + β₆(mes)
+# Features del modelo
+Y_pred = f(
+    level_pct,            # Nivel actual cisterna (%)
+    avg_consumption_lpd,  # Consumo promedio últimos 7 días (InfluxDB)
+    forecast_precip_mm,   # Precipitación NASA POWER próximas 72h
+    temperature_c,        # Temperatura promedio (NASA POWER)
+    humidity_pct,         # Humedad relativa (NASA POWER)
+    days_without_rain,    # Días sin flujo pluvial (InfluxDB)
+    month,                # Mes actual (estacionalidad)
+)
 ```
 
 Con **fallback físico** cuando no hay modelo entrenado:
@@ -832,7 +917,7 @@ PHYSICAL_COEFFICIENTS = [0.002, -0.5, -0.3, 0.05, 0.01, 0.02]
 # coef de: nivel, consumo_7d, consumo_30d, lluvia, dia_semana, mes
 ```
 
-El dato `precipitacion_mm` proviene en tiempo real de la **NASA POWER API** con las coordenadas del dispositivo (Ciudad Nezahualcóyotl: `lat=19.4066, lon=-99.0131`).
+El backend (`ml_service.py`) orquesta automáticamente la consulta a NASA POWER e InfluxDB antes de llamar a `predict_autonomy()`. Si NASA POWER no está disponible, usa defaults seguros (precipitación=0, temperatura=20°C, humedad=50%).
 
 ### Detección de Fugas con GNN
 
@@ -952,11 +1037,20 @@ El roadmap hacia **TRL 7-9** incluye:
 | **TRL 8** | Certificación COFEPRIS para el proceso de filtración | Aprobación sanitaria |
 | **TRL 9** | Manufactura a escala, distribución municipal | Política pública hídrica |
 
+**Logros recientes (v2.x):**
+- ✅ **Suite de tests completa:** 6 módulos de prueba (MQTT, ML, NASA, InfluxDB, WebSocket, Alerts) con fixtures y mocks en `conftest.py`.
+- ✅ **CORS middleware manual** implementado para compatibilidad con acceso LAN desde dispositivos móviles.
+- ✅ **Nginx integrado** en el container del frontend, eliminando el servicio proxy separado.
+- ✅ **RBAC inicial:** Modelos `Role`, `SensorType` y `ValveType` añadidos al ORM.
+- ✅ **Pipeline ML en producción:** `hydrov-ml/src/inference/` con `predict_autonomy.py` y `detect_leaks.py` conectados al backend.
+- ✅ **UI responsiva con hamburger menu:** `Sidebar` y `Navbar` adaptados para móvil; `NotificationsPanel` como slide-over.
+
 **Líneas de investigación abiertas:**
 - **Redes Neuronales de Grafos (GNN) a escala:** Entrenar la GNN con datos reales de 50+ nodos para detección de fugas en la red municipal de distribución.
 - **Calibración automática del turbidímetro:** Autoajuste de la curva de conversión ADC→NTU con muestras periódicas de referencia.
 - **GAN para datos sintéticos:** El módulo `gan_synthetic.py` permite generar datos de entrenamiento realistas cuando no hay suficientes eventos de lluvia reales.
 - **Optimización energética con deep sleep:** El firmware ya tiene la arquitectura preparada (`RTC_DATA_ATTR`) para agregar `esp_deep_sleep_start()` sin cambios de diseño.
+- **RBAC completo:** Expandir el modelo `Role` para control de acceso granular por zona geográfica.
 
 ---
 
