@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     ALGORITHM:              str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # ── API Key para servicios internos (Grafana → Backend) ───────
+    # Permite acceso server-to-server sin JWT interactivo.
+    # Enviar como header: X-API-Key: <valor>
+    GRAFANA_API_KEY: str = "hydrov_grafana_secret_2026"
+
     # ── CORS ──────────────────────────────────────────────────────
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",   # React dev

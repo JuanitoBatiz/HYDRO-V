@@ -18,7 +18,7 @@
         "label": "Nodo",
         "type": "query",
         "datasource": {"type": "postgres", "uid": "hydrov-postgres"},
-        "query": "SELECT device_id FROM devices WHERE is_active = true ORDER BY device_id",
+        "query": "SELECT device_code FROM devices WHERE status = 'active' ORDER BY device_code",
         "current": {"text": "All", "value": "$__all"},
         "refresh": 2,
         "multi": true,
@@ -215,7 +215,7 @@
         {
           "refId": "A",
           "rawQuery": true,
-          "rawSql": "SELECT d.device_id, d.name, d.lat AS latitude, d.lon AS longitude, COALESCE(AVG(l.anomaly_score), 0) AS risk_score FROM devices d LEFT JOIN leak_detections l ON d.device_id = l.node_id AND l.detected_at > NOW() - INTERVAL '1 hour' WHERE d.is_active = true GROUP BY d.device_id, d.name, d.lat, d.lon",
+          "rawSql": "SELECT d.device_code, d.latitude, d.longitude, COALESCE(AVG(l.anomaly_score), 0) AS risk_score FROM devices d LEFT JOIN leak_detections l ON d.device_code = l.node_id AND l.detected_at > NOW() - INTERVAL '1 hour' WHERE d.status = 'active' GROUP BY d.device_code, d.latitude, d.longitude",
           "format": "table"
         }
       ],

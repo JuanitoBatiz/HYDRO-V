@@ -3,11 +3,13 @@
 Dependencias reutilizables de FastAPI.
 Importar desde aquí en todos los endpoints para evitar duplicación.
 """
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import get_current_user_id, oauth2_scheme
 from app.db.session import AsyncSessionLocal
 from app.db.influx_client import InfluxManager
@@ -117,3 +119,53 @@ async def get_current_superuser(
             detail="Se requieren permisos de administrador",
         )
     return user
+
+
+# ─────────────────────────────────────────────────────────────────
+#  Acceso server-to-server (Grafana / servicios internos)
+# ─────────────────────────────────────────────────────────────────
+
+# Esquemas de seguridad para verify_grafana_or_user:
+# auto_error=False → la función decide el 401, no FastAPI automáticamente.
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+_optional_bearer = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
+
+
+async def verify_grafana_or_user(
+    x_api_key: str | None = Depends(_api_key_header),
+    token:     str | None = Depends(_optional_bearer),
+) -> dict:
+    """
+    Dependencia dual para endpoints consumidos por Grafana y usuarios humanos.
+
+    Flujo de resolución (en orden):
+      1. Si el header X-API-Key está presente y coincide con GRAFANA_API_KEY
+         → acceso concedido como identidad interna 'grafana-service'.
+      2. Si hay un Bearer token válido en Redis
+         → acceso concedido como el usuario autenticado.
+      3. En cualquier otro caso → 401 Unauthorized.
+
+    Uso:
+        async def endpoint(_ = Depends(verify_grafana_or_user)): ...
+    """
+    # ── Rama 1: API Key de servicio ──────────────────────────────
+    if x_api_key is not None:
+        if x_api_key == settings.GRAFANA_API_KEY:
+            return {"sub": "grafana-service", "role_id": 0, "internal": True}
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-API-Key inválida",
+        )
+
+    # ── Rama 2: JWT Bearer ───────────────────────────────────────
+    if token:
+        session_data = await redis_service.redis_client.get(f"session:{token}")
+        if session_data:
+            return json.loads(session_data)
+
+    # ── Rama 3: Sin credenciales ─────────────────────────────────
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Se requiere autenticación (Bearer token o X-API-Key)",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

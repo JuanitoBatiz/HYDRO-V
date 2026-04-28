@@ -20,5 +20,5 @@ datasources:
       postgresVersion: 1500
       timescaledb: false
     secureJsonData:
-      password: hydrov1234
+      password: ${POSTGRES_PASSWORD}
     editable: true

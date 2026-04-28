@@ -9,8 +9,10 @@ from app.core.config import settings
 ML_PATH = Path(__file__).parent.parent.parent.parent / "hydrov-ml" / "src"
 sys.path.insert(0, str(ML_PATH))
 
-from inference.predict_autonomy import predict_autonomy
-from inference.detect_leaks import detect_leak
+# NOTA: predict_autonomy y detect_leak se importan de forma lazy (dentro de
+# cada método) para evitar que un ModuleNotFoundError de numpy/torch tumbe
+# todo el backend al arrancar. Los endpoints ML fallarán individualmente
+# con 503 si los paquetes no están instalados, sin afectar al resto del sistema.
 
 
 class MLService:
@@ -74,6 +76,13 @@ class MLService:
         # ── Días sin lluvia (desde InfluxDB) ─────────────────────
         days_without_rain = await influx.get_days_without_rain(node_id)
 
+        # ── Lazy import: evita crash de inicio si numpy/torch no están ──
+        try:
+            from inference.predict_autonomy import predict_autonomy
+        except ImportError as exc:
+            logger.error(f"[ML] Dependencias de ML no disponibles: {exc}")
+            raise RuntimeError("Módulo ML no disponible") from exc
+
         result = predict_autonomy(
             level_pct=level_pct,
             avg_consumption_lpd=avg_consumption,
@@ -108,6 +117,13 @@ class MLService:
 
         neighbor_flows  = [n["flow_lpm"]  for n in neighbors]
         neighbor_levels = [n["level_pct"] for n in neighbors]
+
+        # ── Lazy import: evita crash de inicio si numpy/torch no están ──
+        try:
+            from inference.detect_leaks import detect_leak
+        except ImportError as exc:
+            logger.error(f"[ML] Dependencias de ML no disponibles: {exc}")
+            raise RuntimeError("Módulo ML no disponible") from exc
 
         result = detect_leak(
             node_id=node_id,

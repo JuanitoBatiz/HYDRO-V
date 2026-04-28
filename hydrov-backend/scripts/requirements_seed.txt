@@ -1,0 +1,9 @@
+# hydrov-backend/scripts/requirements_seed.txt
+# Dependencias adicionales para ejecutar los scripts de seed
+# desde el HOST (fuera del contenedor).
+# Dentro del contenedor ya están instaladas vía requirements.txt.
+
+asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.0
+influxdb-client[async]>=1.40.0
+bcrypt>=4.0.0

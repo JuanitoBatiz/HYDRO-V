@@ -82,6 +82,7 @@ services:
       REDIS_HOST: redis
       INFLUX_URL: http://influxdb:8086
       PYTHONPATH: "/app:/hydrov-ml"
+      GRAFANA_API_KEY: ${GRAFANA_API_KEY:-hydrov_grafana_secret_2026}
     volumes:
       - ./hydrov-backend:/app
       - ./hydrov-ml:/hydrov-ml:ro
@@ -102,6 +103,15 @@ services:
       start_period: 20s
     networks:
       - hydrov-net
+    # Encadena migración Alembic antes de arrancar el servidor.
+    # Garantiza que el esquema esté siempre actualizado en cada deploy.
+    command: >
+      bash -c "
+        echo '[entrypoint] Ejecutando alembic upgrade head...' &&
+        alembic upgrade head &&
+        echo '[entrypoint] Migraciones OK. Arrancando uvicorn...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level info
+      "
 
   # ── Frontend React/Vite (Nginx SPA + reverse proxy a /api/) ───────
   frontend:
@@ -143,6 +153,7 @@ services:
     container_name: hydrov-grafana
     restart: unless-stopped
     environment:
+      GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource"
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-hydrov2024}
       GF_SERVER_ROOT_URL: http://localhost:3000
@@ -157,6 +168,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-hydrov}
       POSTGRES_USER: ${POSTGRES_USER:-hydrov}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GRAFANA_API_KEY: ${GRAFANA_API_KEY:-hydrov_grafana_secret_2026}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro

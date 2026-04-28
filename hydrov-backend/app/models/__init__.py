@@ -9,3 +9,4 @@ from .sensor import Sensor
 from .valve import Valve
 from .alert import Alert
 from .audit_log import AuditLog
+from .leak_detection import LeakDetection

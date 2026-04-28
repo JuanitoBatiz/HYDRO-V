@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_db, get_current_user, verify_grafana_or_user
 from app.models.user import User
 from app.models.device import Device
 from app.services.ml_service import ml_service
@@ -27,7 +27,7 @@ async def predict_autonomy(
         description="Nivel actual de la cisterna en porcentaje (0-100). Si no se envía, usa Redis."
     ),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: dict = Depends(verify_grafana_or_user),
 ) -> dict:
     """
     Predice cuántos días de agua le quedan al nodo combinando:
@@ -55,7 +55,7 @@ async def predict_autonomy(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Nodo '{node_id}' no encontrado",
         )
-    if not device.is_active:
+    if device.status != 'active':
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Nodo '{node_id}' está inactivo",
@@ -76,8 +76,8 @@ async def predict_autonomy(
         prediction = await ml_service.get_autonomy_prediction(
             node_id=node_id,
             level_pct=level_pct,
-            lat=device.lat,
-            lon=device.lon,
+            lat=device.latitude,
+            lon=device.longitude,
         )
     except Exception as e:
         logger.error(f"[Predictions] Error en autonomy para {node_id}: {e}")
@@ -198,7 +198,7 @@ async def full_prediction(
             flow_lpm = float(sensors.get("flow_lpm", 0))
 
     autonomy = await ml_service.get_autonomy_prediction(
-        node_id=node_id, level_pct=level_pct, lat=device.lat, lon=device.lon,
+        node_id=node_id, level_pct=level_pct, lat=device.latitude, lon=device.longitude,
     )
     leaks = await ml_service.get_leak_detection(
         node_id=node_id, flow_lpm=flow_lpm, level_pct=level_pct,

@@ -29,4 +29,4 @@ class Device(Base):
     # emergency_alerts: Mapped[list["EmergencyAlert"]] = relationship("EmergencyAlert", back_populates="device")
 
     # autonomy_predictions: Mapped[list["AutonomyPrediction"]] = relationship(...)
-    # leak_detections:      Mapped[list["LeakDetection"]]      = relationship(...)
+    leak_detections: Mapped[list["LeakDetection"]] = relationship("LeakDetection", back_populates="device")

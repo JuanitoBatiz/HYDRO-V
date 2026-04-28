@@ -28,6 +28,12 @@ RUN pip install --upgrade pip \
 # ── LA CORRECCIÓN MÁGICA: Instalar requirements extra súper rápido ──
 COPY requirements-extra.txt .
 RUN pip install --prefix=/install --no-cache-dir -r requirements-extra.txt
+
+# ── Dependencias del módulo ML (numpy, torch, scikit-learn) ──────
+# ml-requirements.txt es una copia de hydrov-ml/requirements.txt
+# ubicada dentro del contexto de build para que Docker pueda acceder a ella.
+COPY ml-requirements.txt .
+RUN pip install --prefix=/install --no-cache-dir -r ml-requirements.txt
 # ─────────────────────────────────────────────────────────────────
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────
