@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/IPN-CECyT_9_Juan_de_Dios_Bátiz-900000?style=for-the-badge&logo=academia&logoColor=white"/>
-<img src="https://img.shields.io/badge/Premio_Nacional_Juvenil_del_Agua-2026-1a73e8?style=for-the-badge&logo=water&logoColor=white"/>
 
 # 💧 HYDRO-V
 ### Sistema Ciber-Físico de Gestión Hídrica Inteligente
@@ -68,7 +66,7 @@
 
 ## 🌊 Sobre el Proyecto
 
-**Hydro-V** es un sistema ciber-físico (Cyber-Physical System, CPS) de gestión hídrica domiciliaria diseñado específicamente para mitigar la crisis multidimensional del agua en zonas urbanas de alta vulnerabilidad. Desarrollado en el **CECyT 9 "Juan de Dios Bátiz" del IPN** como candidato al **Premio Nacional Juvenil del Agua 2026**, el proyecto representa la aplicación de tecnologías de la Industria 4.0 a uno de los problemas sociales más urgentes de las megaciudades latinoamericanas.
+**Hydro-V** es un sistema ciber-físico (Cyber-Physical System, CPS) de gestión hídrica domiciliaria diseñado específicamente para mitigar la crisis multidimensional del agua en zonas urbanas de alta vulnerabilidad. El proyecto representa la aplicación de tecnologías de la Industria 4.0 a uno de los problemas sociales más urgentes de las megaciudades latinoamericanas.
 
 El sistema transforma cada vivienda en un **nodo activo de gestión hídrica**, capaz de:
 
@@ -78,7 +76,7 @@ El sistema transforma cada vivienda en un **nodo activo de gestión hídrica**, 
 - **Detectar fugas** en la red hídrica local mediante una Red Neuronal de Grafos (GNN/GraphSAGE).
 - **Emitir alertas** y permitir **control remoto** del nodo desde un dashboard web en tiempo real.
 
-> **Presupuesto del prototipo (TRL 4): $3,200 MXN · ROI estimado: ~8 meses**
+> **Presupuesto del prototipo (TRL 4): $1,650 MXN · Ahorro anual proyectado: $9,000 MXN · ROI: 2.2 meses**
 
 ---
 
@@ -1004,12 +1002,17 @@ El prototipo fue validado bajo protocolo experimental TRL 4 (laboratorio + campo
 
 ### Análisis Financiero
 
-| Concepto | Valor |
-|----------|-------|
-| Costo del prototipo | **$3,200 MXN** |
-| Gasto anual en pipas (vivienda promedio) | ~$6,400 MXN/año |
-| Ahorro estimado con Hydro-V | ~$4,800 MXN/año |
-| **ROI Simple** | **~8 meses** |
+| Parámetro | Valor | Fuente |
+|-----------|-------|--------|
+| Precipitación anual promedio, Nezahualcóyotl | 600 mm/año | NASA POWER, período 2010–2023 (19.40°N, 99.02°O) |
+| Área de captación de la azotea | 100 m² | Medición directa en vivienda de prueba |
+| Coeficiente de escorrentía | 0.85 | Superficie de concreto (Tchobanoglous et al., 2003) |
+| Factor de mejora del algoritmo dT/dt | +36.3% | Resultado experimental — n = 10 eventos |
+| Volumen captable anual proyectado | 51,000 L/año | Calculado con los parámetros anteriores |
+| Costo mixto ponderado por llenado de cisterna | $600 MXN | Reportado por familia beneficiaria, abr. 2026 |
+| Ahorro anual proyectado | **$9,000 MXN/año** | Equivalente a 15 llenados de cisterna al costo ponderado |
+| Costo total del sistema HYDRO-V | **$1,650 MXN** | Costo neto de materiales del prototipo final |
+| **Tiempo de recuperación (ROI)** | **2.2 meses** | $1,650 ÷ ($9,000 / 12 meses) |
 
 ---
 
@@ -1059,21 +1062,19 @@ El roadmap hacia **TRL 7-9** incluye:
 | Concepto | Componente | Costo (MXN) |
 |---------|-----------|-------------|
 | Control | ESP32 DevKit V1 + PCB | $180 |
-| Sensórica | Turbidez Gravity + Flujo YF-S201 + Nivel JSN-SR04T | $1,000 |
-| Actuadores | 2× Válvulas Solenoides 1/2" Latón 12V NC | $560 |
-| Filtración | Filtro Pro-V (PVC 4" + Zeolita 2kg + Carbón 1kg) | $380 |
-| Infraestructura | Gabinete IP65 + Fuente 12V/2A + Conectores | $1,080 |
-| **TOTAL** | | **$3,200 MXN** |
+| Sensórica | Turbidez Gravity + Flujo YF-S201 + Nivel JSN-SR04T | $650 |
+| Actuadores | 2× Válvulas Solenoides 1/2" Latón 12V NC | $320 |
+| Filtración | Filtro Pro-V (PVC 4" + Zeolita 2kg + Carbón 1kg) | $300 |
+| Infraestructura | Gabinete IP65 + Fuente 12V/2A + Conectores | $200 |
+| **TOTAL** | | **$1,650 MXN** |
 
-> *El costo puede reducirse ~15% en producción en serie debido a economías de escala en materiales de filtración.*
+> *Costo neto de materiales del prototipo final. El volumen captable anual proyectado es de 51,000 L/año, generando un ahorro de $9,000 MXN/año (equivalente a 15 llenados de cisterna al costo ponderado de $600 MXN c/u), con un retorno de inversión de **2.2 meses**.*
 
 ---
 
 ## 👥 Contacto y Equipo
 
-**Institución:** Instituto Politécnico Nacional — CECyT 9 "Juan de Dios Bátiz"
 **Ubicación:** Ciudad Nezahualcóyotl, Estado de México, México
-**Concurso:** Premio Nacional Juvenil del Agua 2026
 
 | Rol | Nombre | Contacto |
 |-----|--------|---------|
@@ -1118,7 +1119,6 @@ Desarrollado con ❤️ en Ciudad Nezahualcóyotl, Estado de México
 
 *"La alta tecnología, cuando se aplica con enfoque social, es la clave para la resiliencia urbana."*
 
-[![IPN](https://img.shields.io/badge/IPN-Instituto_Politécnico_Nacional-900000?style=flat-square)](https://www.ipn.mx)
-[![CECyT 9](https://img.shields.io/badge/CECyT_9-Juan_de_Dios_Bátiz-1a73e8?style=flat-square)](https://www.cecyt9.ipn.mx)
+
 
 </div>
